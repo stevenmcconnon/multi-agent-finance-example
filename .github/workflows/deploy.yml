@@ -1,0 +1,71 @@
+# Manual only. Builds both images into ECR and shows a plan. The web image is the nginx-served
+# Vite dist/; in AWS the same `pnpm build` output is synced to the S3 bucket (modules/web).
+# In production: `terraform apply` runs from a reviewed plan artifact in a protected environment.
+# In this demo: the workflow stops at `plan`, because nothing in a career sample should create
+#   billable resources on a button press; `apply` stays a human command (see infra/terraform/COST.md).
+name: deploy
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: image tag to push (default = commit sha)
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TAG: ${{ inputs.image_tag || github.sha }}
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: build and push api
+        run: |
+          docker build -f services/Dockerfile -t "$REGISTRY/harness-rag-api:$TAG" .
+          docker push "$REGISTRY/harness-rag-api:$TAG"
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+      - name: build and push web
+        run: |
+          docker build --build-arg VITE_API_URL="${{ vars.PUBLIC_API_URL }}" \
+            --build-arg VITE_AUTH_MODE=cognito \
+            --build-arg VITE_COGNITO_DOMAIN="${{ vars.COGNITO_DOMAIN }}" \
+            --build-arg VITE_COGNITO_CLIENT_ID="${{ vars.COGNITO_CLIENT_ID }}" \
+            --build-arg VITE_REDIRECT_URI="${{ vars.WEB_URL }}/auth/callback" \
+            -t "$REGISTRY/harness-rag-web:$TAG" apps/web
+          docker push "$REGISTRY/harness-rag-web:$TAG"
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+
+  plan:
+    needs: images
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform/envs/dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.3
+      - run: terraform init -input=false
+      - run: terraform plan -input=false -var "image_tag=$TAG" -var "acm_certificate_arn=${{ vars.ACM_CERTIFICATE_ARN }}"
+        env:
+          TF_VAR_demo_password_alice: ${{ secrets.DEMO_PASSWORD_ALICE }}
+          TF_VAR_demo_password_bob: ${{ secrets.DEMO_PASSWORD_BOB }}
+          TF_VAR_demo_password_carol: ${{ secrets.DEMO_PASSWORD_CAROL }}

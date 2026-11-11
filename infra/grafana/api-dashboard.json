@@ -1,0 +1,23 @@
+{
+  "title": "harness-rag API",
+  "uid": "harness-rag-api",
+  "schemaVersion": 39,
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries", "title": "Requests / s by route",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum by (handler) (rate(http_requests_total[5m]))" }]
+    },
+    {
+      "type": "timeseries", "title": "p95 latency (s)",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, handler) (rate(http_request_duration_seconds_bucket[5m])))" }]
+    },
+    {
+      "type": "timeseries", "title": "5xx / s",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))" }]
+    }
+  ]
+}

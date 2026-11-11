@@ -1,0 +1,33 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: api
+          scrape_interval: 30s
+          static_configs:
+            - targets: ["localhost:8000"]
+processors:
+  batch: {}
+exporters:
+  awsemf:
+    namespace: ${project}
+    region: ${region}
+    log_group_name: /${project}/metrics
+  otlphttp/phoenix:
+    endpoint: ${phoenix_endpoint}
+    tls:
+      insecure: true
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/phoenix]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [batch]
+      exporters: [awsemf]

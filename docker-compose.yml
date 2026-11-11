@@ -1,0 +1,90 @@
+# Local stack, $0. `make up` → API :8000, web :3000, Temporal UI :8233, Phoenix :6006.
+# One root `.env` (copy .env.example) feeds api and ingest-worker; compose overrides the
+# hostnames below so the same file also works for `uv run` on the host.
+x-app: &app
+  build:
+    context: .
+    dockerfile: services/Dockerfile
+  env_file:
+    - path: .env
+      required: false   # config.py defaults cover a fresh clone
+  environment:
+    DATABASE_URL: postgresql://harness:harness@postgres:5432/harness
+    REDIS_URL: redis://valkey:6379/0
+    TEMPORAL_ADDRESS: temporal:7233
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
+  volumes:
+    - fastembed-cache:/home/app/.cache/fastembed
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: harness
+      POSTGRES_PASSWORD: harness
+      POSTGRES_DB: harness
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U harness -d harness"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    ports: ["6379:6379"]
+
+  # In production: Temporal server on Fargate with RDS Postgres persistence (infra/terraform/modules/compute).
+  # In this demo: the in-memory dev server, because workflow history need not survive a laptop restart.
+  temporal:
+    image: temporalio/temporal:latest
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--ui-port", "8233"]
+    ports: ["7233:7233", "8233:8233"]
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports: ["6006:6006"]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib
+    command: ["--config=/etc/otelcol/collector.yaml"]
+    volumes:
+      - ./infra/otel/collector.yaml:/etc/otelcol/collector.yaml:ro
+    ports: ["4318:4318"]
+    depends_on: [phoenix]
+
+  api:
+    <<: *app
+    command: >
+      sh -c "python -m harness_rag.ingest.cli migrate
+             && uvicorn harness_rag.api.app:app --host 0.0.0.0 --port 8000"
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_started }
+      otel-collector: { condition: service_started }
+
+  # `docker compose --profile temporal up` runs ingestion through Temporal instead of inline.
+  ingest-worker:
+    <<: *app
+    command: ["python", "-m", "harness_rag.ingest.cli", "worker"]
+    profiles: [temporal]
+    depends_on:
+      postgres: { condition: service_healthy }
+      temporal: { condition: service_started }
+
+  web:            # Vite SPA, static dist/ behind nginx (apps/web/Dockerfile); VITE_* are baked at build
+    build:
+      context: apps/web
+      args:
+        VITE_API_URL: http://localhost:8000
+        VITE_AUTH_MODE: local
+    ports: ["${WEB_PORT:-3000}:3000"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  fastembed-cache:
