@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import AnswerCard from "@/components/AnswerCard";
 import EventTimeline, { type TimelineItem } from "@/components/EventTimeline";
+import HitlCard from "@/components/HitlCard";
 import { PERSONAS, approve, errorMessage, getMe, getToken, streamChat, switchPersona } from "@/lib/api";
-import { answerOutcome, outcomeStrip } from "@/lib/present";
 
 type Turn = { question: string; items: TimelineItem[]; user: string; groups: string[] };
 // The exact strings pinned in docs/CONTRACTS.md ("Example questions"); DEMO.md and the tests use the same ones.
@@ -28,6 +29,7 @@ export default function ChatPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const reAsking = useRef(false); // "Re-ask as" switches persona itself and keeps the compare view
   const input = useRef<HTMLInputElement>(null);
+  const liveTurn = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!getToken()) navigate("/", { replace: true });
@@ -37,6 +39,18 @@ export default function ChatPage() {
     // the input is disabled during a turn, which drops focus; give it back without scrolling away from the answer
     if (!busy) input.current?.focus({ preventScroll: true });
   }, [busy]);
+
+  // The result (or an approval that is waiting) sits right under the question; bring it into view when it lands,
+  // because the trace below it is longer than a screen.
+  const live = turns[turns.length - 1];
+  const landed = live?.items.some((it) => it.event.type === "answer")
+    ? "answer"
+    : live?.items.some((it) => it.event.type === "hitl" && it.hitlDecision === undefined)
+      ? "approval"
+      : "";
+  useEffect(() => {
+    if (landed) liveTurn.current?.scrollIntoView({ block: "start" });
+  }, [landed, turns.length]);
 
   const pushEvent = (item: TimelineItem) =>
     setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? { ...t, items: [...t.items, item] } : t)));
@@ -98,7 +112,6 @@ export default function ChatPage() {
       const turn: Turn = { question: t.question, items: [], user: me.user_id, groups: me.groups };
       setTurns([turn]);
       await streamChat(t.question, tid, (ev) => pushEvent({ event: ev }));
-      window.scrollTo({ top: 0 }); // both outcome strips sit at the top; that contrast is the point of a re-ask
     });
 
   const decide = (approved: boolean) => {
@@ -133,15 +146,15 @@ export default function ChatPage() {
     return () => window.removeEventListener("hr-persona", onPersona);
   }, []);
 
-  const column = (list: Turn[], live: boolean) =>
+  const column = (list: Turn[], isLive: boolean) =>
     list.map((t, i) => {
       const policy = t.items.find((it) => it.event.type === "policy")?.event;
       const answer = t.items.find((it) => it.event.type === "answer")?.event;
       const done = answer !== undefined;
-      const outcome = answer?.type === "answer" ? answerOutcome(answer.data.reason, answer.data.abstained) : null;
-      const last = live && i === list.length - 1;
+      const last = isLive && i === list.length - 1;
+      const waiting = last ? t.items.find((it) => it.event.type === "hitl" && it.hitlDecision === undefined)?.event : undefined;
       return (
-        <section key={i} className="min-w-0 space-y-3">
+        <section key={i} ref={last ? liveTurn : undefined} className="min-w-0 scroll-mt-4 space-y-3">
           {prior && (
             <div className="flex flex-wrap items-center gap-2 border-b border-neutral-300 pb-1 text-sm dark:border-neutral-700">
               <span className="font-semibold">{t.user}</span>
@@ -157,16 +170,20 @@ export default function ChatPage() {
               )}
             </div>
           )}
-          {prior && outcome && answer?.type === "answer" && (
-            // the two results sit at different heights under their traces; this line puts them side by side
-            <p className={`rounded px-3 py-2 text-sm font-semibold ${outcome.kind === "none" ? "bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200" : "bg-green-100 text-green-900 dark:bg-green-900/50 dark:text-green-200"}`}>
-              {outcomeStrip(outcome, answer.data.citations.length)}
-            </p>
-          )}
           <div className="rounded-xl border border-blue-300 bg-blue-50/70 px-4 py-3 shadow-sm dark:border-blue-800 dark:bg-blue-950/25">
             <p className="text-[0.68rem] font-bold tracking-[0.18em] text-blue-700 dark:text-blue-300">USER QUESTION</p>
             <p className="mt-1 break-words font-medium">{t.question}</p>
           </div>
+          {/* the outcome first, then how the team got there: in a compare view the two results line up at the top */}
+          {answer?.type === "answer" && (
+            <div data-turn-result>
+              <AnswerCard answer={answer.data} />
+            </div>
+          )}
+          {!done && waiting?.type === "hitl" && (
+            <HitlCard tool={waiting.data.tool} arguments={waiting.data.arguments} reason={waiting.data.reason} busy={busy} onDecide={decide} />
+          )}
+          <p className="pt-2 text-[0.68rem] font-bold tracking-[0.18em] text-neutral-500">HOW THE AGENT TEAM GOT THERE</p>
           <EventTimeline items={t.items} busy={busy && last} onDecide={decide} />
           {done && !busy && (
             <div className="flex flex-wrap gap-2">

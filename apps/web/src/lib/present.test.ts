@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { SESSION_EXPIRED, THREAD_OWNER, answerOutcome, errorSentence, modelName, outcomeStrip, sectionLabel } from "./present.ts";
+import { SESSION_EXPIRED, THREAD_OWNER, answerOutcome, errorSentence, modelName, sectionLabel } from "./present.ts";
 
 test("model ids read as names, the stub never as 'fake'", () => {
   assert.equal(modelName("fake"), "offline stub");
@@ -44,10 +44,3 @@ test("the headline follows Answer.reason and falls back to abstained when it is 
   assert.equal(answerOutcome("some_future_reason", true).badge, "No answer");
 });
 
-test("the compare strip is one line per run", () => {
-  assert.equal(outcomeStrip(answerOutcome("answered", false), 1), "Answered · 1 citation");
-  assert.equal(outcomeStrip(answerOutcome(undefined, false), 3), "Answered · 3 citations");
-  assert.equal(outcomeStrip(answerOutcome(undefined, true), 0), "No answer");
-  assert.equal(outcomeStrip(answerOutcome("out_of_scope", true), 0), "No answer · Not a question about the filings");
-  assert.equal(outcomeStrip(answerOutcome("action_done", false), 0), "Action completed");
-});

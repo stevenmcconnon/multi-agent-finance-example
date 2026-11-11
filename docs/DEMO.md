@@ -52,9 +52,9 @@ Proves: a grounded, cited answer, with the deterministic gates and the model ste
 
 ![alice and bob side by side](screenshots/10-persona-compare.png) ![bob alone](screenshots/05-bob-chat.png)
 
-Under alice's answer click **Re-ask as bob**: the same question runs as bob in a second column, each column
-topped by an outcome strip ("Answered · N citations" for alice, "No answer · None of the documents this
-person may read answer the question" for bob).
+Under alice's answer click **Re-ask as bob**: the same question runs as bob in a second column. Each column
+shows its result first, right under the question (alice's cited answer; for bob "No answer: None of the
+documents you are allowed to read answer that question."), with the agent team's trace below it.
 
 Say: "bob is in engineering. He may read the Form 8-K (current report) filings only, and they do not answer
 a supply-chain question, so the reranker's relevance floor drops them. With no evidence left the Writer is
@@ -143,8 +143,9 @@ Proves: LangGraph Postgres checkpointer, replay, thread ownership; item-level pe
 
 The chat page at phone width: ![mobile chat](screenshots/09-mobile-chat.png)
 
-Optional: open Phoenix at http://localhost:6006, project "multi-agent-finance". Each turn is a trace with
-the graph nodes and one TOOL span per guarded tool call; health checks are not traced.
+Optional: open Phoenix at http://localhost:6006, project "multi-agent-finance". The trace list focuses on
+requests, agent turns, graph nodes and guarded TOOL calls. Health checks, metrics and individual SQL
+statements are intentionally not traced, so operational noise does not bury the multi-agent workflow.
 
 ## 4:30 Close
 

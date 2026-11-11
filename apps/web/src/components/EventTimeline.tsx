@@ -3,7 +3,6 @@ import { getConfig } from "@/lib/api";
 import { answerOutcome, sectionLabel } from "@/lib/present";
 import type { TurnEvent } from "@/lib/schemas";
 import { groupTimelineItems, type TimelinePhase } from "@/lib/timeline";
-import AnswerCard from "./AnswerCard";
 import HitlCard from "./HitlCard";
 
 export type TimelineItem = { event: TurnEvent; hitlDecision?: boolean };
@@ -200,11 +199,7 @@ function EventRow({ item, index, busy, answered, onDecide }: { item: TimelineIte
         </Row>
       );
     case "answer":
-      return (
-        <Row key={index} label="answer">
-          <AnswerCard answer={e.data} />
-        </Row>
-      );
+      return null; // the page shows the answer above the trace
     case "error":
       return (
         <Row key={index} label="error">
@@ -225,7 +220,9 @@ export default function EventTimeline({ items, busy, onDecide }: Props) {
   useEffect(() => {
     getConfig().then((c) => setOffline(c !== null && c.model_backend !== "bedrock"));
   }, []);
-  const groups = groupTimelineItems(items);
+  // The page shows the answer, and an approval that is still waiting, above this trace; the trace leaves them out.
+  const lifted = (item: TimelineItem) => item.event.type === "answer" || (item.event.type === "hitl" && item.hitlDecision === undefined);
+  const groups = groupTimelineItems(items.filter((item) => !lifted(item)));
 
   return (
     <div className="space-y-3">

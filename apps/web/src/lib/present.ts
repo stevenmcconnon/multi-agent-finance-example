@@ -63,8 +63,3 @@ const BY_REASON: Record<string, Outcome> = {
 export function answerOutcome(reason: string | null | undefined, abstained: boolean): Outcome {
   return (reason ? BY_REASON[reason] : undefined) ?? (abstained ? none("") : ANSWERED);
 }
-
-export function outcomeStrip(o: Outcome, citations: number): string {
-  if (o.kind === "answer") return `Answered · ${citations} citation${citations === 1 ? "" : "s"}`;
-  return [o.badge, o.headline].filter(Boolean).join(" · ");
-}
