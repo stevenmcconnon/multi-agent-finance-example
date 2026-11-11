@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="13">
+<title>harness-rag on AWS (infra/terraform/envs/dev)</title>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker></defs>
+<text x="24" y="30" font-size="20" font-weight="600" fill="#6b7280">harness-rag on AWS — infra/terraform/envs/dev</text>
+<rect x="50" y="56" width="200" height="60" rx="8" fill="#334155"/>
+<text x="62" y="77" font-size="14" font-weight="600" fill="#fff">Analyst's browser</text>
+<text x="62" y="95" font-size="11.5" fill="#fff" opacity="0.92">React (Vite) SPA</text>
+<text x="62" y="110" font-size="11.5" fill="#fff" opacity="0.92">Bearer JWT from Cognito</text>
+<rect x="1050" y="560" width="130" height="70" rx="8" fill="#334155"/>
+<text x="1062" y="581" font-size="14" font-weight="600" fill="#fff">SEC EDGAR</text>
+<text x="1062" y="599" font-size="11.5" fill="#fff" opacity="0.92">sec.gov, public</text>
+<text x="1062" y="614" font-size="11.5" fill="#fff" opacity="0.92">EDGAR_USER_AGENT</text>
+<rect x="40" y="136" width="990" height="744" rx="12" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="7 5"/>
+<text x="52" y="157" font-size="14" font-weight="600" fill="#6b7280">AWS account · one region  (trust boundary)</text>
+<rect x="270" y="172" width="142" height="66" rx="8" fill="#15803d"/>
+<text x="282" y="193" font-size="13" font-weight="600" fill="#fff">CloudFront + S3</text>
+<text x="282" y="211" font-size="11.5" fill="#fff" opacity="0.92">modules/web</text>
+<text x="282" y="226" font-size="11.5" fill="#fff" opacity="0.92">static dist/, OAC</text>
+<rect x="422" y="172" width="142" height="66" rx="8" fill="#15803d"/>
+<text x="434" y="193" font-size="13" font-weight="600" fill="#fff">Cognito user pool</text>
+<text x="434" y="211" font-size="11.5" fill="#fff" opacity="0.92">modules/identity</text>
+<text x="434" y="226" font-size="11.5" fill="#fff" opacity="0.92">code + PKCE, groups</text>
+<rect x="574" y="172" width="142" height="66" rx="8" fill="#b91c1c"/>
+<text x="586" y="193" font-size="13" font-weight="600" fill="#fff">Verified Permissions</text>
+<text x="586" y="211" font-size="11.5" fill="#fff" opacity="0.92">modules/policy</text>
+<text x="586" y="226" font-size="11.5" fill="#fff" opacity="0.92">db/policies/*.cedar</text>
+<rect x="726" y="172" width="142" height="66" rx="8" fill="#6d28d9"/>
+<text x="738" y="193" font-size="13" font-weight="600" fill="#fff">Amazon Bedrock</text>
+<text x="738" y="211" font-size="11.5" fill="#fff" opacity="0.92">Claude Sonnet / Haiku 4.5</text>
+<text x="738" y="226" font-size="11.5" fill="#fff" opacity="0.92">Titan v2 512, Cohere Rerank</text>
+<rect x="878" y="172" width="142" height="66" rx="8" fill="#0f766e"/>
+<text x="890" y="193" font-size="13" font-weight="600" fill="#fff">S3 raw filings</text>
+<text x="890" y="211" font-size="11.5" fill="#fff" opacity="0.92">S3_RAW_BUCKET</text>
+<text x="890" y="226" font-size="11.5" fill="#fff" opacity="0.92">the Authority store</text>
+<rect x="60" y="330" width="950" height="440" rx="10" fill="none" stroke="#6b7280" stroke-width="1.5"/>
+<text x="72" y="351" font-size="13" font-weight="600" fill="#6b7280">VPC  modules/network: public subnets, VPC endpoints (Bedrock, Secrets Manager, ECR, Logs), S3 gateway endpoint</text>
+<text x="72" y="370" font-size="11" fill="#6b7280">In production: private subnets behind NAT or egress-only endpoints.  In this demo: public subnets, no NAT gateway, because NAT alone is ~$33/month.</text>
+<rect x="70" y="440" width="200" height="60" rx="8" fill="#334155"/>
+<text x="82" y="461" font-size="13" font-weight="600" fill="#fff">Application Load Balancer</text>
+<text x="82" y="479" font-size="11.5" fill="#fff" opacity="0.92">HTTP(S) → api:8000</text>
+<rect x="300" y="392" width="540" height="360" rx="8" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="7 5"/>
+<text x="312" y="413" font-size="13" font-weight="600" fill="#6b7280">ECS Fargate cluster  modules/compute</text>
+<rect x="320" y="420" width="240" height="80" rx="8" fill="#1d4ed8"/>
+<text x="332" y="441" font-size="14" font-weight="600" fill="#fff">api service</text>
+<text x="332" y="459" font-size="11.5" fill="#fff" opacity="0.92">FastAPI + LangGraph + harness</text>
+<text x="332" y="474" font-size="11.5" fill="#fff" opacity="0.92">autoscaled on CPU</text>
+<text x="332" y="489" font-size="11.5" fill="#fff" opacity="0.92">sidecar: ADOT collector → CloudWatch</text>
+<rect x="320" y="540" width="240" height="80" rx="8" fill="#0f766e"/>
+<text x="332" y="561" font-size="14" font-weight="600" fill="#fff">ingest-worker service</text>
+<text x="332" y="579" font-size="11.5" fill="#fff" opacity="0.92">Temporal worker: discover, fetch,</text>
+<text x="332" y="594" font-size="11.5" fill="#fff" opacity="0.92">parse_and_write, finish</text>
+<text x="332" y="609" font-size="11.5" fill="#fff" opacity="0.92">dead letter: ingest_jobs.status = 'dead'</text>
+<rect x="320" y="660" width="240" height="60" rx="8" fill="#0f766e"/>
+<text x="332" y="681" font-size="14" font-weight="600" fill="#fff">temporal service</text>
+<text x="332" y="699" font-size="11.5" fill="#fff" opacity="0.92">server + UI :8233, single task</text>
+<rect x="590" y="660" width="230" height="60" rx="8" fill="#334155"/>
+<text x="602" y="681" font-size="14" font-weight="600" fill="#fff">phoenix service</text>
+<text x="602" y="699" font-size="11.5" fill="#fff" opacity="0.92">LLM traces (openinference)</text>
+<rect x="860" y="420" width="140" height="80" rx="8" fill="#b45309"/>
+<text x="872" y="441" font-size="13" font-weight="600" fill="#fff">RDS Postgres 16</text>
+<text x="872" y="459" font-size="11.5" fill="#fff" opacity="0.92">pgvector HNSW, tsvector</text>
+<text x="872" y="474" font-size="11.5" fill="#fff" opacity="0.92">facts, document_acl</text>
+<text x="872" y="489" font-size="11.5" fill="#fff" opacity="0.92">audit, checkpoints, jobs</text>
+<rect x="860" y="520" width="140" height="60" rx="8" fill="#b45309"/>
+<text x="872" y="541" font-size="13" font-weight="600" fill="#fff">ElastiCache Valkey</text>
+<text x="872" y="559" font-size="11.5" fill="#fff" opacity="0.92">group cache, TTL 300 s</text>
+<rect x="860" y="640" width="140" height="80" rx="8" fill="#334155"/>
+<text x="872" y="661" font-size="13" font-weight="600" fill="#fff">Secrets Manager</text>
+<text x="872" y="679" font-size="11.5" fill="#fff" opacity="0.92">RDS password by ARN,</text>
+<text x="872" y="694" font-size="11.5" fill="#fff" opacity="0.92">read by the execution role</text>
+<rect x="60" y="790" width="300" height="66" rx="8" fill="#334155"/>
+<text x="72" y="811" font-size="13" font-weight="600" fill="#fff">CloudWatch Logs + Grafana</text>
+<text x="72" y="829" font-size="11.5" fill="#fff" opacity="0.92">modules/observability</text>
+<text x="72" y="844" font-size="11.5" fill="#fff" opacity="0.92">ADOT sidecar, optional AMG</text>
+<rect x="380" y="790" width="300" height="66" rx="8" fill="#334155"/>
+<text x="392" y="811" font-size="13" font-weight="600" fill="#fff">ECR</text>
+<text x="392" y="829" font-size="11.5" fill="#fff" opacity="0.92">api and web images</text>
+<text x="392" y="844" font-size="11.5" fill="#fff" opacity="0.92">deploy.yml stops at plan</text>
+<rect x="700" y="790" width="300" height="66" rx="8" fill="#334155"/>
+<text x="712" y="811" font-size="13" font-weight="600" fill="#fff">EventBridge Scheduler</text>
+<text x="712" y="829" font-size="11.5" fill="#fff" opacity="0.92">modules/schedule</text>
+<text x="712" y="844" font-size="11.5" fill="#fff" opacity="0.92">run-task: ingest CLI</text>
+<line x1="150" y1="116" x2="150" y2="440" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="158" y="300" font-size="11" fill="#6b7280" text-anchor="start">POST /chat (SSE), Bearer JWT</text>
+<line x1="250" y1="86" x2="290" y2="172" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="282" y="140" font-size="11" fill="#6b7280" text-anchor="middle">GET SPA</text>
+<line x1="270" y1="470" x2="320" y2="470" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="560" y1="470" x2="860" y2="460" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="700" y="452" font-size="11" fill="#6b7280" text-anchor="middle">SQL (psycopg)</text>
+<line x1="560" y1="490" x2="860" y2="550" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="790" y="560" font-size="11" fill="#6b7280" text-anchor="middle">groups</text>
+<line x1="430" y1="420" x2="634" y2="238" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="400" y="330" font-size="11" fill="#6b7280" text-anchor="middle">is_authorized</text>
+<line x1="520" y1="420" x2="786" y2="238" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="640" y="330" font-size="11" fill="#6b7280" text-anchor="middle">converse, embed, rerank</text>
+<line x1="560" y1="560" x2="948" y2="238" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="905" y="300" font-size="11" fill="#6b7280" text-anchor="middle">put / get originals</text>
+<line x1="560" y1="580" x2="860" y2="480" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="630" y="567" font-size="11" fill="#6b7280" text-anchor="middle">facts, chunks</text>
+<line x1="560" y1="600" x2="1050" y2="600" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="960" y="594" font-size="11" fill="#6b7280" text-anchor="middle">fetch filings</text>
+<line x1="440" y1="620" x2="440" y2="660" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="560" y1="610" x2="590" y2="660" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="740" y1="790" x2="740" y2="752" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="748" y="776" font-size="11" fill="#6b7280">ECS run-task on a schedule</text>
+<text x="24" y="892" font-size="11" fill="#6b7280">Sizes and list prices: infra/terraform/COST.md (about $5/day, nothing metered here). Teardown: make tf-destroy. The browser signs in at the Cognito hosted UI with authorization code + PKCE.</text>
+</svg>
