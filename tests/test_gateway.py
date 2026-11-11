@@ -337,3 +337,21 @@ async def test_bedrock_plan_reads_tool_use_after_reasoning_whatever_the_stop_rea
     assert [c.tool for c in calls] == ["facts_sql"]
     assert client.kwargs["inferenceConfig"] == {"maxTokens": 4000}
     assert client.kwargs["modelId"] == BedrockGateway().models[ModelRole.generate]
+
+
+def test_years_and_filler_words_are_not_matching_terms():
+    """Found live: re-asking the net-income comparison as a reader without the annual report quoted a sentence
+    about notes because it shared "2024" and "2026"; "How many employees..." abstained because "many" had to match."""
+    from finance_agents.gateway.fake import write_extractive
+
+    def prompt(question: str, evidence: str) -> str:
+        return f"QUESTION: {question}\n\nEVIDENCE:\n[1] {evidence}"
+
+    notes = (
+        "The Notes are being issued pursuant to an indenture, dated as of November 1, 2024, together with the "
+        "officer's certificate, dated November 9, 2026."
+    )
+    question = "How did Apple's net income change from fiscal 2024 to fiscal 2026?"
+    assert write_extractive(prompt(question, notes)) == ABSTAIN_TEXT
+    staff = "As of September 26, 2026, the Company had approximately 167,000 full-time equivalent employees."
+    assert "167,000" in write_extractive(prompt("How many employees does Apple have?", staff))

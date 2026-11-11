@@ -75,7 +75,7 @@ _STOP = set(
     "the a an of in on to for and or is are was were be been what which who whom how did does do its it about say "
     "says said from with by that this these those as at has have had their they any such not can could would may "
     "according describe describes tell show list compare summarize summarise explain give find outline identify "
-    "provide discuss please you your i me my there".split()
+    "provide discuss please you your i me my there many much main major key most fiscal year years quarter".split()
 )
 # Never content: "hello", "thanks, that is great" and the like are not requests about the filings.
 _SMALL_TALK = set("hello hi hey thanks thank thx bye goodbye good morning afternoon evening great cool nice".split())
@@ -131,7 +131,10 @@ _ENTITY_WORDS = {w.lower() for w in (*_COMPANY_TICKER, *KNOWN_TICKERS)}
 def _terms(question: str) -> set[str]:
     """What a sentence must match: the question's content words without entity words, as a phrase (`_PHRASES`)
     or a stem."""
-    return {_PHRASES.get(w) or w.rstrip("s")[:6] for w in _words(question) if w not in _ENTITY_WORDS}
+    # Numbers are never terms: a sentence that merely shares "2024" and "2026" with the question does not answer it.
+    return {
+        _PHRASES.get(w) or w.rstrip("s")[:6] for w in _words(question) if w not in _ENTITY_WORDS and not w.isdigit()
+    }
 
 
 def _score(terms: set[str], sentence: str) -> int:
