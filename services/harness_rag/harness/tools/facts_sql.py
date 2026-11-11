@@ -34,7 +34,10 @@ class FactsSqlTool:
             citations=[
                 Citation(
                     document_id=f.document_id,
+                    title=str(f.provenance.get("title", "")) or None,
                     uri=str(f.provenance.get("uri", "")),
+                    section=f"XBRL fact {f.concept}",
+                    version=str(f.provenance.get("version", "")) or None,
                     snippet=str(f.provenance.get("raw_text", ""))[:200],
                 )
                 for f in facts

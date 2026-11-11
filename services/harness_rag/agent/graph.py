@@ -222,8 +222,25 @@ async def _tool(
 
 
 def _evidence(state: TurnState) -> list[tuple[str, Citation]]:
-    """What the model may see: retrieved chunks and facts, each with its citation. Nothing else."""
+    """What the model may see: facts first (the exact number with its source row), then retrieved chunks,
+    each with its citation. Nothing else."""
     items: list[tuple[str, Citation]] = []
+    for f in state.get("facts", []):
+        prov = f.get("provenance") or {}
+        text = f"{f['entity']} {f['concept']} for the period ending {f['period_end']}: {f['value']:,.2f} {f['unit']}."
+        items.append(
+            (
+                text,
+                Citation(
+                    document_id=f["document_id"],
+                    title=prov.get("title") or None,
+                    uri=str(prov.get("uri", "")),
+                    section=f"XBRL fact {f['concept']} {prov.get('fp') or ''} {prov.get('fy') or ''}".strip(),
+                    version=prov.get("version") or prov.get("accn") or None,
+                    snippet=text,
+                ),
+            )
+        )
     for c in state.get("chunks", []):
         items.append(
             (
@@ -236,18 +253,6 @@ def _evidence(state: TurnState) -> list[tuple[str, Citation]]:
                     section=c.get("section"),
                     version=c.get("version"),
                     snippet=c["content"][:200],
-                ),
-            )
-        )
-    for f in state.get("facts", []):
-        text = f"{f['entity']} {f['concept']} for the period ending {f['period_end']}: {f['value']:,.2f} {f['unit']}."
-        items.append(
-            (
-                text,
-                Citation(
-                    document_id=f["document_id"],
-                    uri=str((f.get("provenance") or {}).get("uri", "")),
-                    snippet=text,
                 ),
             )
         )

@@ -45,10 +45,11 @@ LIMIT %(k)s
 """
 
 FACTS_SQL = f"""
-SELECT c.id, c.document_id, c.entity, c.concept, c.period_start, c.period_end, c.value, c.unit, c.provenance
+SELECT c.id, c.document_id, c.entity, c.concept, c.period_start, c.period_end, c.value, c.unit, c.provenance,
+       d.uri AS document_uri, d.title AS document_title, d.version AS document_version
 FROM facts c
 JOIN documents d ON d.id = c.document_id
-WHERE c.entity = %(entity)s AND c.concept = %(concept)s
+WHERE c.entity = %(entity)s AND c.concept = ANY(%(concepts)s)
   AND (%(period_end)s::date IS NULL OR c.period_end = %(period_end)s::date)
   AND {SCOPE_PREDICATE}
 ORDER BY c.period_end DESC NULLS LAST

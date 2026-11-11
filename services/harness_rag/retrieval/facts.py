@@ -12,6 +12,12 @@ from . import sql
 Fetch = Callable[[str, dict[str, Any]], Awaitable[list[dict[str, Any]]]]
 
 
+# Filers report revenue under either tag; a question about "revenue" must find both (XBRL US-GAAP taxonomy).
+CONCEPT_ALIASES: dict[str, list[str]] = {
+    "Revenues": ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax"],
+}
+
+
 class PgFactStore:
     def __init__(self, fetch: Fetch | None = None, limit: int = 50) -> None:
         self._fetch = fetch
@@ -34,7 +40,7 @@ class PgFactStore:
             {
                 **sql.acl_params(principal),
                 "entity": entity,
-                "concept": concept,
+                "concepts": CONCEPT_ALIASES.get(concept, [concept]),
                 "period_end": period_end,
                 "k": self._limit,
             },
@@ -49,7 +55,12 @@ class PgFactStore:
                 period_end=r.get("period_end"),
                 value=float(r["value"]),
                 unit=r["unit"],
-                provenance=r.get("provenance") or {},
+                provenance={
+                    **(r.get("provenance") or {}),
+                    "uri": r.get("document_uri") or "",
+                    "title": r.get("document_title") or "",
+                    "version": r.get("document_version") or "",
+                },
             )
             for r in rows
         ]

@@ -244,3 +244,32 @@ async def test_rerank_floor_drops_irrelevant_authorized_chunks(monkeypatch):
     q = UnderstoodQuery(original="x", rewritten="x", intent=QueryIntent.lookup)
     out = await r.retrieve(RetrievalRequest(principal=ALICE, query=q))
     assert [c.score for c in out.chunks] == [3.2]
+
+
+async def test_fact_query_expands_revenue_aliases_and_carries_document_provenance():
+    from harness_rag.retrieval.facts import PgFactStore
+
+    seen: dict = {}
+
+    async def fetch(sql_text, params, **_):
+        seen.update(params)
+        return [
+            {
+                "id": uuid.uuid4(),
+                "document_id": uuid.uuid4(),
+                "entity": "AAPL",
+                "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+                "period_start": None,
+                "period_end": None,
+                "value": 1.0,
+                "unit": "USD",
+                "provenance": {"accn": "x"},
+                "document_uri": "https://sec.gov/f",
+                "document_title": "AAPL 10-K",
+                "document_version": "x",
+            }
+        ]
+
+    facts = await PgFactStore(fetch=fetch).query(ALICE, "AAPL", "Revenues")
+    assert "RevenueFromContractWithCustomerExcludingAssessedTax" in seen["concepts"]
+    assert facts[0].provenance["uri"] == "https://sec.gov/f" and facts[0].provenance["title"] == "AAPL 10-K"
