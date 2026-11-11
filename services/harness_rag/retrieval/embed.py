@@ -37,14 +37,16 @@ class FastEmbedEmbedder:
                 if self._model is None:
                     from fastembed import TextEmbedding  # heavy import, deferred
 
-                    self._model = await asyncio.to_thread(TextEmbedding, model_name=self.model_name)
+                    # Small batches and few threads: fastembed's defaults (batch 256, every core) peaked at 5 GB on a
+                    # 53-chunk 10-K and the container was OOM-killed (2026-11-10). Throughput is not the demo's job.
+                    self._model = await asyncio.to_thread(TextEmbedding, model_name=self.model_name, threads=2)
         return self._model
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
         model = await self._load()
-        vectors = await asyncio.to_thread(lambda: [v.tolist() for v in model.embed(texts)])
+        vectors = await asyncio.to_thread(lambda: [v.tolist() for v in model.embed(texts, batch_size=8)])
         for v in vectors:
             if len(v) != self.dim:
                 raise ValueError(f"{self.model_name} returned dim {len(v)}, expected {self.dim}")

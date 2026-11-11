@@ -44,8 +44,13 @@ services:
     command: ["server", "start-dev", "--ip", "0.0.0.0", "--ui-port", "8233"]
     ports: ["7233:7233", "8233:8233"]
 
+  # In production: Phoenix behind auth with a system API key in OTEL_EXPORTER_OTLP_HEADERS (authorization=Bearer ...).
+  # In this demo: auth off, because the collector is reachable only on this machine and Phoenix v21 (2026-11)
+  # otherwise answers every exporter with 401.
   phoenix:
     image: arizephoenix/phoenix:latest
+    environment:
+      PHOENIX_ENABLE_AUTH: "false"
     ports: ["6006:6006"]
 
   otel-collector:

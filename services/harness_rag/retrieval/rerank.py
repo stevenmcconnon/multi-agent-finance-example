@@ -44,14 +44,14 @@ class FastEmbedReranker:
                 if self._model is None:
                     from fastembed.rerank.cross_encoder import TextCrossEncoder
 
-                    self._model = await asyncio.to_thread(TextCrossEncoder, model_name=self.model_name)
+                    self._model = await asyncio.to_thread(TextCrossEncoder, model_name=self.model_name, threads=2)
         return self._model
 
     async def rerank(self, query: str, chunks: list[Chunk], top_n: int) -> list[Chunk]:
         if not chunks:
             return []
         model = await self._load()
-        scores = await asyncio.to_thread(lambda: list(model.rerank(query, [c.content for c in chunks])))
+        scores = await asyncio.to_thread(lambda: list(model.rerank(query, [c.content for c in chunks], batch_size=8)))
         return _apply(chunks, list(enumerate(float(s) for s in scores)), top_n)
 
 
