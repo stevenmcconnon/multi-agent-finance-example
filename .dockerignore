@@ -1,0 +1,17 @@
+.git
+.venv
+.env
+.env.*
+!.env.example
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+node_modules
+apps
+infra
+evals
+tests
+docs
+data
+*.tfstate*

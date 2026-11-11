@@ -1,0 +1,72 @@
+// harness-rag authorization schema (Cedar 4 schema syntax).
+//
+// Principal = User (built from the verified JWT, never from the prompt).
+//   org    : the caller's org uuid, as a string
+//   uid    : user_id
+//   groups : group names the user belongs to (e.g. "finance")
+//   roles  : viewer | analyst | admin
+//   acl_ids: the same identities in ACL spelling: "user:<uid>" plus "group:<name>" for every group.
+//            Cedar has no map(); the authorizer precomputes this so policies can use containsAny.
+// Resource = Document (item-level ACL) or Org (org-wide actions, tools).
+//   Document.readers : the ACL principals of the document, as "user:<id>" / "group:<name>" strings.
+// Actions:
+//   retrieve, answer         -> Document or Org
+//   tool:<name>              -> Org; read tools live under ReadTools, write/money tools under WriteTools
+namespace HarnessRag {
+  entity Org = {
+    "org": String,
+  };
+  entity User = {
+    "org": String,
+    "uid": String,
+    "groups": Set<String>,
+    "roles": Set<String>,
+    "acl_ids": Set<String>,
+  };
+  entity Document = {
+    "org": String,
+    "readers": Set<String>,
+  };
+
+  action "retrieve", "answer" appliesTo {
+    principal: [User],
+    resource: [Document, Org],
+    context: {}
+  };
+
+  action "ReadTools";
+  action "WriteTools";
+
+  // Retrieval as a tool: any role in its own org; the SQL ACL predicate filters every row anyway.
+  action "tool:search_documents" appliesTo {
+    principal: [User],
+    resource: [Org],
+    context: {}
+  };
+
+  action "tool:facts_sql" in [ReadTools] appliesTo {
+    principal: [User],
+    resource: [Org],
+    context: {}
+  };
+  action "tool:calculator" in [ReadTools] appliesTo {
+    principal: [User],
+    resource: [Org],
+    context: {}
+  };
+  action "tool:create_ticket" in [WriteTools] appliesTo {
+    principal: [User],
+    resource: [Org],
+    context: {}
+  };
+  action "tool:send_report" in [WriteTools] appliesTo {
+    principal: [User],
+    resource: [Org],
+    context: {}
+  };
+  action "tool:transfer_funds" in [WriteTools] appliesTo {
+    principal: [User],
+    resource: [Org],
+    context: {}
+  };
+}
