@@ -1,3 +1,6 @@
+import re
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,6 +48,18 @@ class Settings(BaseSettings):
 
     bedrock_guardrail_id: str = ""  # empty = Bedrock Guardrails off (local demo)
     bedrock_guardrail_version: str = "DRAFT"
+
+    @field_validator("bedrock_guardrail_id")
+    @classmethod
+    def _guardrail_id_is_an_id(cls, v: str) -> str:
+        """Refuse to start on anything that is not a guardrail id or ARN. An env file line such as
+        `BEDROCK_GUARDRAIL_ID=   # comment` hands the comment over as the value, which once switched the
+        content filter on with a nonsense id and failed every question."""
+        v = v.strip()
+        if v and not re.fullmatch(r"[a-z0-9]+|arn:aws[a-z-]*:bedrock:[a-z0-9-]+:\d{12}:guardrail/[a-z0-9]+", v):
+            raise ValueError(f"BEDROCK_GUARDRAIL_ID {v!r} is not a guardrail id; leave it empty to turn it off")
+        return v
+
     hr_rate_limit_per_minute: int = 30
 
 

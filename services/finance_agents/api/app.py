@@ -122,7 +122,18 @@ async def _guard_output(events: AsyncIterator[TurnEvent], first: TurnEvent | Non
             )
             text = out.text
             if BEDROCK_GUARDRAIL.enabled:
-                text = (await BEDROCK_GUARDRAIL.apply(text, "OUTPUT")).text or text
+                try:
+                    text = (await BEDROCK_GUARDRAIL.apply(text, "OUTPUT")).text or text
+                except Exception as exc:  # fail closed: an unfiltered answer is never sent
+                    log.warning("output content filter unavailable: %s", exc)
+                    yield TurnEvent(
+                        type="error",
+                        data={
+                            "code": "content_filter_unavailable",
+                            "message": "The content filter could not be reached, so the answer was withheld.",
+                        },
+                    )
+                    return
             ev.data["text"] = text
             yield TurnEvent(
                 type="guardrail", data={"stage": "output", "redactions": out.redactions, "uncited": out.uncited}
@@ -200,7 +211,13 @@ async def chat(body: ChatBody, principal: Caller) -> EventSourceResponse:
         raise HTTPException(422, {"reasons": verdict.reasons})
     question = verdict.redacted_question
     if BEDROCK_GUARDRAIL.enabled:
-        outcome = await BEDROCK_GUARDRAIL.apply(question, "INPUT")
+        try:
+            outcome = await BEDROCK_GUARDRAIL.apply(question, "INPUT")
+        except Exception as exc:  # fail closed, and say why instead of a bare 500
+            log.warning("input content filter unavailable: %s", exc)
+            raise HTTPException(
+                503, "The content filter could not be reached, so the question was not processed."
+            ) from None
         if outcome.blocked:
             raise HTTPException(422, {"reasons": ["bedrock_guardrail"], "message": outcome.text})
     first = TurnEvent(

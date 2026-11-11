@@ -128,3 +128,26 @@ async def test_converse_receives_guardrail_config_only_when_configured(monkeypat
 async def test_audit_rows_carry_no_pii(offline):
     await audit.record("guardrail", ALICE, {"q": "mail a@b.co", "nested": ["555-123-4567"]}, "t1")
     assert offline[-1][2] == {"q": "mail [redacted-email]", "nested": ["[redacted-phone]"]}
+
+
+def test_env_example_has_no_inline_comments():
+    """Docker hands `KEY=   # note` to the container with the note as the value (2026-11-11: that switched
+    Bedrock Guardrails on with a nonsense id and failed every question on a fresh clone)."""
+    from pathlib import Path
+
+    bad = [
+        line
+        for line in Path(__file__).parent.parent.joinpath(".env.example").read_text().splitlines()
+        if "=" in line and not line.lstrip().startswith("#") and " #" in line.split("=", 1)[1]
+    ]
+    assert not bad, bad
+
+
+def test_a_comment_as_guardrail_id_refuses_to_start():
+    import pytest as _pytest
+    from finance_agents.config import Settings
+
+    with _pytest.raises(ValueError, match="not a guardrail id"):
+        Settings(bedrock_guardrail_id="# empty = Bedrock Guardrails off")
+    assert Settings(bedrock_guardrail_id="  ").bedrock_guardrail_id == ""
+    assert Settings(bedrock_guardrail_id="abc123xyz").bedrock_guardrail_id == "abc123xyz"
