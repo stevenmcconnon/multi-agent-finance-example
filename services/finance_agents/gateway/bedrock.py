@@ -83,18 +83,10 @@ class BedrockGateway:
         )
         return text, usage
 
-    async def plan(
-        self,
-        question: str,
-        understood: UnderstoodQuery,
-        tools: list[ToolSpec],
-        evidence_summary: str | None,
-    ) -> list[ToolCall]:
+    async def plan(self, question: str, understood: UnderstoodQuery, tools: list[ToolSpec]) -> list[ToolCall]:
         if not tools:  # converse rejects an empty toolConfig
             return []
         prompt = f"QUESTION: {question}\nUNDERSTOOD: {understood.model_dump_json()}"
-        if evidence_summary:
-            prompt += f"\nEVIDENCE SO FAR: {evidence_summary}"
         offered = {t.name for t in tools}
         try:
             resp = await asyncio.to_thread(

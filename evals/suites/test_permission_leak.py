@@ -85,7 +85,7 @@ async def test_viewer_tool_denied_by_cedar_not_by_registry(audit_sink, monkeypat
     refused by the Cedar check inside run_tool; the audit row records `forbidden`."""
     from finance_agents.contracts import ToolCall
 
-    async def rogue(question, understood, tools, evidence_summary):
+    async def rogue(question, understood, tools):
         assert "facts_sql" not in {t.name for t in tools}
         return [ToolCall(tool="facts_sql", arguments={"entity": "AAPL", "concept": "Revenues"})]
 

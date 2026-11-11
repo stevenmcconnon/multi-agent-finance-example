@@ -97,7 +97,7 @@ team member acting, and the `status` event carries `{node, agent, kind}`:
 | `answer`, `abstain` | Supervisor | deterministic |
 
     In production: a model-driven supervisor with handoffs and a re-plan loop after evidence arrives
-    (`plan()` already takes `evidence_summary`; the graph passes `None`); a research sub-loop under the same
+    (a second `plan()` call after the Researcher reports, with the evidence so far in the prompt); a research sub-loop under the same
     `run_tool` door; approvals routed to Slack or Teams; multi-day human waits in Temporal.
     In this demo: fixed edges and one pass, because one question per turn is provable and replayable.
 

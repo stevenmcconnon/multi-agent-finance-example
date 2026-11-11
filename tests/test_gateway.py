@@ -15,7 +15,7 @@ ALL = [SEARCH, FACTS, TICKET]
 
 
 async def _plan(gw, question, tools):
-    return await gw.plan(question, understand_heuristic(question), tools, None)
+    return await gw.plan(question, understand_heuristic(question), tools)
 
 
 async def test_fake_plans_facts_then_search_for_a_numeric_question():

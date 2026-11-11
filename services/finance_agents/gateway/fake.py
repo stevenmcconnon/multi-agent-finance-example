@@ -97,13 +97,7 @@ class FakeGateway:
     async def understand(self, question: str) -> UnderstoodQuery:
         return understand_heuristic(question)
 
-    async def plan(
-        self,
-        question: str,
-        understood: UnderstoodQuery,
-        tools: list[ToolSpec],
-        evidence_summary: str | None,
-    ) -> list[ToolCall]:
+    async def plan(self, question: str, understood: UnderstoodQuery, tools: list[ToolSpec]) -> list[ToolCall]:
         return plan_heuristic(question, understood, tools)
 
     async def complete(

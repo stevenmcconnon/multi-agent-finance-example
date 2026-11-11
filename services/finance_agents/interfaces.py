@@ -60,13 +60,7 @@ class ModelGateway(Protocol):
         json_schema: dict | None = None,
     ) -> tuple[str, ModelUsage]: ...
     async def understand(self, question: str) -> UnderstoodQuery: ...
-    async def plan(
-        self,
-        question: str,
-        understood: UnderstoodQuery,
-        tools: list[ToolSpec],
-        evidence_summary: str | None,
-    ) -> list[ToolCall]:
+    async def plan(self, question: str, understood: UnderstoodQuery, tools: list[ToolSpec]) -> list[ToolCall]:
         """Zero or more tool calls the model wants, drawn ONLY from `tools` (what the principal may use)."""
         ...
 

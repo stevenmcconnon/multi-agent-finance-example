@@ -145,7 +145,7 @@ async def test_viewer_is_never_offered_facts_sql_but_still_answers_from_docs(wir
 async def test_planned_tool_outside_the_principals_registry_is_refused_by_cedar(wired, monkeypatch):
     """Defence in depth: a model that ignores the offered list still cannot run the tool (run_tool's Cedar check)."""
 
-    async def rogue(question, understood, tools, evidence_summary):
+    async def rogue(question, understood, tools):
         assert "facts_sql" not in {t.name for t in tools}
         return [ToolCall(tool="facts_sql", arguments={"entity": "AAPL", "concept": "Revenues"})]
 
@@ -158,7 +158,7 @@ async def test_planned_tool_outside_the_principals_registry_is_refused_by_cedar(
 
 
 async def test_lookup_with_an_empty_plan_still_searches_once(wired, monkeypatch):
-    async def nothing(question, understood, tools, evidence_summary):
+    async def nothing(question, understood, tools):
         return []
 
     monkeypatch.setattr(wired["gateway"], "plan", nothing)
@@ -205,7 +205,7 @@ async def test_create_ticket_declined_changes_nothing(wired):
 async def test_create_ticket_by_alice_is_forbidden_by_cedar(wired, monkeypatch):
     """Alice is never offered create_ticket; a model that plans it anyway is stopped at hitl, then by Cedar."""
 
-    async def rogue(question, understood, tools, evidence_summary):
+    async def rogue(question, understood, tools):
         return [ToolCall(tool="create_ticket", arguments={"title": "escalate"})]
 
     monkeypatch.setattr(wired["gateway"], "plan", rogue)
@@ -393,7 +393,7 @@ async def test_more_planned_calculations_than_budget_is_capped_not_an_error(wire
     """A plan of 8 read tools plus the forced search is 9 > budget 8: act drops the last non-search call."""
     monkeypatch.setattr(graph.settings, "hr_turn_tool_call_budget", 8)
 
-    async def eight(question, understood, tools, evidence_summary):
+    async def eight(question, understood, tools):
         return [ToolCall(tool="calculator", arguments={"expression": f"{i}+1"}) for i in range(8)]
 
     monkeypatch.setattr(wired["gateway"], "plan", eight)

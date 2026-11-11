@@ -126,7 +126,7 @@ class Planner:
     async def plan(self, state: TurnState) -> tuple[list[ToolCall], list[str]]:
         """Returns (planned calls, names of the tools offered)."""
         specs = self.registry.specs_for(principal_of(state))
-        calls = await self.gateway.plan(state["question"], UnderstoodQuery(**state["understood"]), specs, None)
+        calls = await self.gateway.plan(state["question"], UnderstoodQuery(**state["understood"]), specs)
         budget = TurnBudget(**state["budget"])
         return calls[: max(budget.tool_calls - budget.tool_calls_used, 0)], [t.name for t in specs]
 
