@@ -24,7 +24,25 @@ def _db_reachable() -> bool:
         return False
 
 
+def _corpus_loaded() -> bool:
+    """CI has the schema and seed but no filings; the search assertions need `make ingest` to have run."""
+    import asyncio
+
+    from harness_rag import db
+
+    async def count() -> int:
+        rows = await db.fetch("SELECT count(*) AS n FROM documents", {})
+        await db.close_pool()
+        return int(rows[0]["n"])
+
+    try:
+        return asyncio.run(count()) > 0
+    except Exception:
+        return False
+
+
 pytestmark = pytest.mark.skipif(not _db_reachable(), reason="DATABASE_URL not reachable")
+needs_corpus = pytest.mark.skipif(not _db_reachable() or not _corpus_loaded(), reason="no filings ingested")
 
 TIMEOUT_S = 120  # the first search loads the embedding models
 
@@ -52,6 +70,7 @@ async def _session_run(user: str, fn):
 QUERY = "Apple supply chain risk"
 
 
+@needs_corpus
 async def test_alice_tools_calculator_and_search():
     async def go(session):
         names = {t.name for t in (await session.list_tools()).tools}
@@ -73,6 +92,7 @@ async def test_alice_tools_calculator_and_search():
     assert any("10-K" in t for t in titles), titles
 
 
+@needs_corpus
 async def test_bob_is_restricted():
     async def go(session):
         names = {t.name for t in (await session.list_tools()).tools}
