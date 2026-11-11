@@ -123,6 +123,7 @@ export default function ChatPage() {
             </div>
           )}
           <p className="rounded bg-neutral-200/60 px-3 py-2 font-medium dark:bg-neutral-800">{t.question}</p>
+          {t.items.length > 0 && <p className="text-xs text-neutral-500">Grey = deterministic step, blue = model call, orange = a human decides</p>}
           <EventTimeline items={t.items} busy={busy && last} onDecide={decide} />
           {done && !busy && (
             <div className="flex flex-wrap gap-2">

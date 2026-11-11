@@ -12,6 +12,15 @@ const Badge = ({ ok, children }: { ok: boolean; children: React.ReactNode }) => 
   </span>
 );
 
+type Kind = "deterministic" | "model" | "human";
+const KIND_STYLE: Record<Kind, string> = {
+  deterministic: "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300",
+  model: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200",
+  human: "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200",
+};
+const KindBadge = ({ kind }: { kind?: Kind }) =>
+  kind ? <span className={`ml-2 rounded px-1.5 py-0.5 text-xs font-medium ${KIND_STYLE[kind]}`}>{kind}</span> : null;
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <li className="flex gap-3">
@@ -31,14 +40,16 @@ export default function EventTimeline({ items, busy, onDecide }: Props) {
         switch (e.type) {
           case "status":
             return (
-              <Row key={idx} label="status">
+              <Row key={idx} label={e.data.agent ?? "status"}>
                 <span className="font-mono">{e.data.node}</span>
+                <KindBadge kind={e.data.kind} />
                 {e.data.message && <span className="text-neutral-500"> — {e.data.message}</span>}
               </Row>
             );
           case "policy":
             return (
-              <Row key={idx} label="policy">
+              <Row key={idx} label="Guard">
+                <KindBadge kind="deterministic" />{" "}
                 <Badge ok={e.data.allow}>{e.data.allow ? "allow" : "deny"}</Badge>{" "}
                 <span className="font-mono">{e.data.action}</span> on <span className="font-mono">{e.data.resource}</span>
                 {e.data.fail_closed && <span className="ml-2 font-semibold text-red-700 dark:text-red-300">fail-closed (decided by outage)</span>}
@@ -48,7 +59,8 @@ export default function EventTimeline({ items, busy, onDecide }: Props) {
             );
           case "retrieval":
             return (
-              <Row key={idx} label="retrieval">
+              <Row key={idx} label="Researcher">
+                <KindBadge kind="deterministic" />{" "}
                 {e.data.candidate_count} candidates → {e.data.chunks.length} authorized
                 <ul className="mt-1 space-y-0.5">
                   {e.data.chunks.map((c, i) => (
@@ -63,7 +75,8 @@ export default function EventTimeline({ items, busy, onDecide }: Props) {
             );
           case "tool":
             return (
-              <Row key={idx} label="tool">
+              <Row key={idx} label="Researcher">
+                <KindBadge kind="deterministic" />{" "}
                 <Badge ok={e.data.ok}>{e.data.ok ? "ok" : "failed"}</Badge> <span className="font-mono">{e.data.tool}</span>
                 <span className="text-neutral-500"> · {e.data.latency_ms} ms{e.data.from_cache && " · cached"}</span>
                 {e.data.error && <p className="text-red-700 dark:text-red-300">{e.data.error}</p>}
@@ -73,7 +86,8 @@ export default function EventTimeline({ items, busy, onDecide }: Props) {
             return null;
           case "hitl":
             return (
-              <Row key={idx} label="hitl">
+              <Row key={idx} label="Approver">
+                <KindBadge kind="human" />
                 <HitlCard tool={e.data.tool} arguments={e.data.arguments} reason={e.data.reason} decided={hitlDecision} busy={busy} onDecide={onDecide} />
               </Row>
             );

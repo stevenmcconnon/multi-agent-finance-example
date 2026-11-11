@@ -41,3 +41,15 @@ Temporal owns ingestion durability (retries, backoff, dead-letter via `ingest_jo
 
 ## Auth flow decision
 Cognito: authorization code + Proof Key for Code Exchange (PKCE) in the browser (no client secret). Never the implicit flow.
+
+## The agent team (pinned 2026-11-11, Steve: "it's supposed to be a multi-agentic workflow with deterministic and non-deterministic parts")
+One LangGraph graph is the **Supervisor**: deterministic routing between specialized agents, checkpointed, replayable.
+| Agent | Kind | Owns | Model role |
+|---|---|---|---|
+| Guard | deterministic | identity → Principal, Cedar `answer` decision, fail closed | none |
+| Planner | model (non-deterministic) | understands the question, chooses tools from `registry.specs_for(principal)` via Bedrock Converse tool use | `understand`, `plan` |
+| Researcher | deterministic | runs the planned calls through `harness.runner.run_tool`, assembles evidence (facts first, then chunks), relevance floor | none |
+| Approver | human | approves or denies write/money tools through the interrupt | none |
+| Writer | model (non-deterministic) | grounded draft from the evidence only, cites by index | `generate` |
+| Judge | model (non-deterministic, second cheaper model) | verifies every claim against the evidence; one retry, then abstain | `verify` |
+`status` TurnEvents carry `{node, agent, kind: "deterministic"|"model"|"human", message}`. Node names stay (`understand`, `policy`, `plan`, `act`, `generate`, `verify`, `answer`); `agent` is the team member acting in that node.

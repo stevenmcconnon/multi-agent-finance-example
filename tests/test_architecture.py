@@ -60,3 +60,21 @@ def test_documents_route_reuses_the_predicate():
     from harness_rag.api import app as api
 
     assert sql.ACL_PREDICATE in api.DOCUMENTS_SQL and "d.deleted_at IS NULL" in api.DOCUMENTS_SQL
+
+
+def test_deterministic_agents_never_reference_the_gateway():
+    """team.py's Guard and Researcher are deterministic: no gateway import, attribute or name inside their bodies."""
+    tree = ast.parse((PKG / "agent" / "team.py").read_text())
+    banned = {"gateway", "_gw", "get_gateway", "ModelGateway", "complete", "FakeGateway", "BedrockGateway"}
+    for cls in (n for n in tree.body if isinstance(n, ast.ClassDef) and n.name in {"Guard", "Researcher"}):
+        seen = set()
+        for node in ast.walk(cls):
+            if isinstance(node, ast.Name):
+                seen.add(node.id)
+            elif isinstance(node, ast.Attribute):
+                seen.add(node.attr)
+            elif isinstance(node, ast.Import | ast.ImportFrom):
+                seen.update(a.name for a in node.names)
+                seen.add(getattr(node, "module", None) or "")
+        hits = {s for s in seen if s in banned or "gateway" in s.lower()}
+        assert hits == set(), f"{cls.name} references the gateway: {hits}"

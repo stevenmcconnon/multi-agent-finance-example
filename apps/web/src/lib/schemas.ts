@@ -58,7 +58,7 @@ const RetrievalChunk = z.object({
 });
 
 export const TurnEvent = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("status"), data: z.object({ node: z.string(), message: z.string().default("") }) }),
+  z.object({ type: z.literal("status"), data: z.object({ node: z.string(), message: z.string().default(""), agent: z.string().optional(), kind: z.enum(["deterministic", "model", "human"]).optional() }) }),
   z.object({ type: z.literal("policy"), data: PolicyDecision }),
   z.object({
     type: z.literal("retrieval"),

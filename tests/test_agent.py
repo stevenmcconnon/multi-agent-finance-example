@@ -7,10 +7,10 @@ from datetime import date
 from uuid import UUID
 
 import pytest
-from harness_rag.agent import graph
+from harness_rag.agent import graph, team
 from harness_rag.agent.graph import approve, replay, run_turn, stream_turn
 from harness_rag.authz import audit
-from harness_rag.contracts import Chunk, Fact, Principal, RetrievalResult, ToolCall
+from harness_rag.contracts import Chunk, Fact, ModelRole, Principal, RetrievalResult, ToolCall
 from harness_rag.gateway import ABSTAIN_TEXT, FakeGateway
 from harness_rag.harness import runner
 from harness_rag.harness.registry import ToolRegistry
@@ -330,3 +330,60 @@ async def test_startup_without_postgres_falls_back_only_in_local_mode(monkeypatc
     await graph.startup()
     assert isinstance(graph._checkpointer, MemorySaver)
     await graph.shutdown()
+
+
+# ---------- the agent team (docs/CONTRACTS.md "The agent team") ----------
+async def test_alice_turn_names_the_agent_and_kind_on_every_status_event(wired):
+    events = [e async for e in stream_turn(ALICE, "What did AAPL say about net sales in 2023?", "t-team")]
+    statuses = [e.data for e in events if e.type == "status"]
+    assert all({"node", "agent", "kind", "message"} <= set(s) for s in statuses)
+    assert [(s["agent"], s["kind"]) for s in statuses] == [
+        ("Planner", "model"),
+        ("Guard", "deterministic"),
+        ("Planner", "model"),
+        ("Researcher", "deterministic"),
+        ("Writer", "model"),
+        ("Judge", "model"),
+    ]
+    assert [s["node"] for s in statuses] == ["understand", "policy", "plan", "act", "generate", "verify"]
+
+
+async def test_researcher_never_calls_the_gateway(wired, monkeypatch):
+    """The act node is deterministic: with the model dead it still runs every planned tool."""
+    gw = wired["gateway"]
+
+    async def dead(*a, **kw):
+        raise AssertionError("the Researcher reached the model")
+
+    events: list = []
+    real_act = graph.act
+
+    async def act_with_dead_model(state):
+        monkeypatch.setattr(gw, "complete", dead)
+        try:
+            return await real_act(state)
+        finally:
+            monkeypatch.setattr(gw, "complete", type(gw).complete.__get__(gw))
+
+    monkeypatch.setattr(graph, "act", act_with_dead_model)
+    graph.configure(gateway=gw, registry=graph._reg(), checkpointer=MemorySaver())  # recompile with the wrapped node
+    events = [e async for e in stream_turn(ALICE, "What was AAPL revenue in 2023?", "t-no-model")]
+    assert [e.data["tool"] for e in events if e.type == "tool"] == ["facts_sql", "search_documents"]
+    assert next(e for e in events if e.type == "status" and e.data["node"] == "act").data["agent"] == "Researcher"
+    assert events[-1].type == "answer" and events[-1].data["abstained"] is False
+
+
+async def test_judge_uses_the_verify_role(wired, monkeypatch):
+    gw = wired["gateway"]
+    real = gw.complete
+    roles: list = []
+
+    async def spy(role, system, messages, **kw):
+        roles.append((role, system))
+        return await real(role, system, messages, **kw)
+
+    monkeypatch.setattr(gw, "complete", spy)
+    await run_turn(ALICE, "What did AAPL say about net sales?", "t-judge")
+    assert [r for r, _ in roles] == [ModelRole.generate, ModelRole.verify]
+    assert roles[0][1] == team.Writer.SYSTEM and roles[1][1] == team.Judge.SYSTEM
+    assert team.Judge.kind == "model" and team.Writer.kind == "model"
