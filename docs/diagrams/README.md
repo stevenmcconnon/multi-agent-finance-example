@@ -4,7 +4,7 @@ Two kinds live in this repository.
 
 **Mermaid, inline in Markdown** (README: sequence, state, flowchart). GitHub renders them; no build step.
 Edit the fenced block, preview on GitHub or with `npx @mermaid-js/mermaid-cli -i README.md` for a local
-render. The state diagram must match `services/harness_rag/agent/graph.py::_graph()`: when a node or edge
+render. The state diagram must match `services/finance_agents/agent/graph.py::_graph()`: when a node or edge
 changes there, change the diagram in the same commit.
 
 **Hand-written Scalable Vector Graphics (SVG)** (`stack.svg`, `aws.svg`). Plain text, a `viewBox` of 1100 or 1200 wide, `system-ui`

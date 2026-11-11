@@ -5,8 +5,8 @@ from __future__ import annotations
 from itertools import pairwise
 
 import pytest
-from harness_rag.ingest import facts, jobs, parse
-from harness_rag.ingest.acl import groups_for
+from finance_agents.ingest import facts, jobs, parse
+from finance_agents.ingest.acl import groups_for
 
 MSG = {
     "org_id": "00000000-0000-0000-0000-000000000001",
@@ -194,8 +194,8 @@ async def test_jobs_succeed_then_skip():
 
 # ---- writer registers the `ingest` audit kind (audit.AUDIT_KINDS is authz's list) ----
 async def test_writer_ingest_audit_kind_is_accepted(monkeypatch):
-    from harness_rag.authz import audit
-    from harness_rag.ingest import writer
+    from finance_agents.authz import audit
+    from finance_agents.ingest import writer
 
     seen = []
 
@@ -209,7 +209,7 @@ async def test_writer_ingest_audit_kind_is_accepted(monkeypatch):
 
 
 def test_parse_html_drops_xml_declaration_and_comments():
-    from harness_rag.ingest.parse import parse_html
+    from finance_agents.ingest.parse import parse_html
 
     html = b"<?xml version='1.0' encoding='ASCII'?><html><body><!-- hidden --><p>Visible prose.</p></body></html>"
     text = " ".join(t for _, t in parse_html(html))
@@ -221,7 +221,7 @@ async def test_bedrock_embedder_retries_throttling_then_succeeds():
     import json
 
     from botocore.exceptions import ClientError
-    from harness_rag.retrieval.embed import BedrockEmbedder
+    from finance_agents.retrieval.embed import BedrockEmbedder
 
     calls = []
 

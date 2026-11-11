@@ -8,11 +8,11 @@ import uuid
 from uuid import UUID
 
 import pytest
-from harness_rag.authz import audit
-from harness_rag.contracts import Principal, QueryIntent, RetrievalRequest, UnderstoodQuery
-from harness_rag.retrieval import PgFactStore, PgHybridRetriever, rrf_fuse, sql
-from harness_rag.retrieval.calculator import CalculatorError, evaluate
-from harness_rag.retrieval.rerank import NoopReranker
+from finance_agents.authz import audit
+from finance_agents.contracts import Principal, QueryIntent, RetrievalRequest, UnderstoodQuery
+from finance_agents.retrieval import PgFactStore, PgHybridRetriever, rrf_fuse, sql
+from finance_agents.retrieval.calculator import CalculatorError, evaluate
+from finance_agents.retrieval.rerank import NoopReranker
 
 ORG = UUID("00000000-0000-0000-0000-000000000001")
 BOB = Principal(user_id="bob", org_id=ORG, org_slug="acme", groups=["engineering"], roles=["viewer"])
@@ -133,7 +133,7 @@ def test_calculator_rejects(expr):
 def _db_reachable() -> bool:
     import asyncio
 
-    from harness_rag import db
+    from finance_agents import db
 
     try:
         return asyncio.run(db.ping(os.environ.get("DATABASE_URL")))
@@ -143,7 +143,7 @@ def _db_reachable() -> bool:
 
 @pytest.mark.skipif(not _db_reachable(), reason="DATABASE_URL not reachable")
 async def test_db_acl_filters_rows_end_to_end():
-    from harness_rag import db
+    from finance_agents import db
 
     await db.run_migrations()
     org = str(ORG)
@@ -179,7 +179,7 @@ async def test_db_acl_filters_rows_end_to_end():
 
 @pytest.mark.skipif(not _db_reachable(), reason="DATABASE_URL not reachable")
 async def test_db_dense_rows_for_a_narrow_reader_survive_the_hnsw_post_filter():
-    from harness_rag import db
+    from finance_agents import db
 
     await db.run_migrations()
     org = str(ORG)
@@ -223,7 +223,7 @@ async def test_db_dense_rows_for_a_narrow_reader_survive_the_hnsw_post_filter():
 
 
 async def test_rerank_floor_drops_irrelevant_authorized_chunks(monkeypatch):
-    from harness_rag.config import settings
+    from finance_agents.config import settings
 
     class _ScoredReranker:
         min_score = 0.0
@@ -247,7 +247,7 @@ async def test_rerank_floor_drops_irrelevant_authorized_chunks(monkeypatch):
 
 
 async def test_fact_query_expands_revenue_aliases_and_carries_document_provenance():
-    from harness_rag.retrieval.facts import PgFactStore
+    from finance_agents.retrieval.facts import PgFactStore
 
     seen: dict = {}
 

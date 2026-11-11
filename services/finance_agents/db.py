@@ -109,7 +109,7 @@ async def run_migrations(directory: Path = MIGRATIONS_DIR) -> list[str]:
     applied: list[str] = []
     async with p.connection() as conn, conn.transaction():
         # Serialize concurrent migrators (two API replicas booting at once) BEFORE the first write.
-        await conn.execute("SELECT pg_advisory_xact_lock(hashtext('harness_rag.schema_migrations'))")
+        await conn.execute("SELECT pg_advisory_xact_lock(hashtext('finance_agents.schema_migrations'))")
         await conn.execute(
             "CREATE TABLE IF NOT EXISTS schema_migrations ("
             "  filename text PRIMARY KEY,"

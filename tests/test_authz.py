@@ -5,11 +5,11 @@ from __future__ import annotations
 from uuid import UUID
 
 import pytest
-from harness_rag.authz import audit
-from harness_rag.authz.cedar_local import CedarLocalAuthorizer
-from harness_rag.authz.group_cache import GroupCache, split_roles
-from harness_rag.authz.verified_permissions import VerifiedPermissionsAuthorizer
-from harness_rag.contracts import Principal
+from finance_agents.authz import audit
+from finance_agents.authz.cedar_local import CedarLocalAuthorizer
+from finance_agents.authz.group_cache import GroupCache, split_roles
+from finance_agents.authz.verified_permissions import VerifiedPermissionsAuthorizer
+from finance_agents.contracts import Principal
 
 ORG = UUID("00000000-0000-0000-0000-000000000001")
 OTHER_ORG = UUID("00000000-0000-0000-0000-000000000002")
@@ -99,7 +99,7 @@ async def test_malformed_resource_fails_closed(authz):
 
 
 async def test_authorizer_exception_fails_closed(authz, monkeypatch, capture_audit):
-    import harness_rag.authz.cedar_local as mod
+    import finance_agents.authz.cedar_local as mod
 
     def boom(*a, **kw):
         raise RuntimeError("cedar engine down")

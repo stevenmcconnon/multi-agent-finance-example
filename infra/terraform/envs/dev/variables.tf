@@ -5,7 +5,7 @@ variable "region" {
 
 variable "project" {
   type    = string
-  default = "harness-rag"
+  default = "multi-agent-finance-example"
 }
 
 variable "acm_certificate_arn" {

@@ -1,4 +1,4 @@
-// harness-rag authorization schema (Cedar 4 schema syntax).
+// multi-agent-finance-example authorization schema (Cedar 4 schema syntax).
 //
 // Principal = User (built from the verified JWT, never from the prompt).
 //   org    : the caller's org uuid, as a string

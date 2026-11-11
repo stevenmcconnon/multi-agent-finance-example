@@ -18,9 +18,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services"))
 
-from harness_rag import db
-from harness_rag.config import settings
-from harness_rag.contracts import ModelRole
+from finance_agents import db
+from finance_agents.config import settings
+from finance_agents.contracts import ModelRole
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ragas_eval import collect, record
@@ -46,7 +46,7 @@ async def main(suite: str = "deepeval") -> int:
     if not await db.ping():
         return skip("DATABASE_URL does not answer")
 
-    from harness_rag.gateway import get_gateway
+    from finance_agents.gateway import get_gateway
 
     gateway = get_gateway()
 

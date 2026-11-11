@@ -33,7 +33,7 @@ Never cut: validation at trust boundaries, error handling that prevents data los
 
 ## This repo's one extra rule: demo vs production callouts
 
-harness-rag is a demonstration that must read as production-shaped. Every place the demo
+multi-agent-finance-example is a demonstration that must read as production-shaped. Every place the demo
 takes a cheaper path than a production deployment would, write the pair in this exact form,
 in code as a comment and in docs as a short block:
 

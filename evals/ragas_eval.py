@@ -25,8 +25,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services"))
 
-from harness_rag import db
-from harness_rag.config import settings
+from finance_agents import db
+from finance_agents.config import settings
 
 DATASET = Path(__file__).resolve().parent / "datasets" / "qa.jsonl"
 THRESHOLDS = {"faithfulness": 0.8, "answer_relevancy": 0.6, "context_precision": 0.5}
@@ -38,7 +38,7 @@ def skip(reason: str, script: str = "ragas_eval") -> int:
 
 
 async def principal_for(user: str):
-    from harness_rag.harness import devtoken, identity
+    from finance_agents.harness import devtoken, identity
 
     return await identity.verify_token(devtoken.mint(user))  # the production door: token -> DB-resolved Principal
 
@@ -52,7 +52,7 @@ async def cited_contexts(answer) -> list[str]:
 
 
 async def collect() -> list[dict]:
-    from harness_rag.agent import graph
+    from finance_agents.agent import graph
 
     await graph.startup()
     samples = []

@@ -19,7 +19,7 @@ from ..authz.group_cache import GroupCache
 from ..config import Settings, settings
 from ..contracts import Principal
 
-LOCAL_ISSUER = "harness-rag-local"
+LOCAL_ISSUER = "multi-agent-finance-example-local"
 ORG_GROUP_PREFIX = "org:"  # Cognito group `org:<slug>` names the user's org (Terraform modules/identity)
 
 

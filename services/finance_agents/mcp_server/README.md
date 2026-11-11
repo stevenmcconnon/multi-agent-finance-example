@@ -12,7 +12,7 @@ An L5 entry point: the harness tools offered over the Model Context Protocol (MC
 ## How it is used
 
 ```sh
-HR_TOKEN=$(uv run python -m harness_rag.harness.devtoken alice) uv run python -m harness_rag.mcp_server.server
+HR_TOKEN=$(uv run python -m finance_agents.harness.devtoken alice) uv run python -m finance_agents.mcp_server.server
 ```
 
 The token is verified by `harness/identity.py`, so a client never names its own roles.

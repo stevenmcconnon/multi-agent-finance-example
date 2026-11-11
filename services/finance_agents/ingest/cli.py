@@ -1,4 +1,4 @@
-"""`uv run python -m harness_rag.ingest.cli run|worker|migrate`."""
+"""`uv run python -m finance_agents.ingest.cli run|worker|migrate`."""
 
 from __future__ import annotations
 

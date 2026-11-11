@@ -9,17 +9,17 @@ from uuid import UUID
 import fakeredis
 import pytest
 from fastapi.testclient import TestClient
-from harness_rag import db
-from harness_rag.agent import graph
-from harness_rag.api import app as api
-from harness_rag.authz import audit
-from harness_rag.authz.group_cache import GroupCache
-from harness_rag.contracts import Chunk, RetrievalResult
-from harness_rag.gateway import FakeGateway
-from harness_rag.harness import identity, runner
-from harness_rag.harness.devtoken import DEV_USERS, mint
-from harness_rag.harness.registry import ToolRegistry
-from harness_rag.harness.tools import CalculatorTool, CreateTicketTool, FactsSqlTool, SearchDocumentsTool
+from finance_agents import db
+from finance_agents.agent import graph
+from finance_agents.api import app as api
+from finance_agents.authz import audit
+from finance_agents.authz.group_cache import GroupCache
+from finance_agents.contracts import Chunk, RetrievalResult
+from finance_agents.gateway import FakeGateway
+from finance_agents.harness import identity, runner
+from finance_agents.harness.devtoken import DEV_USERS, mint
+from finance_agents.harness.registry import ToolRegistry
+from finance_agents.harness.tools import CalculatorTool, CreateTicketTool, FactsSqlTool, SearchDocumentsTool
 from langgraph.checkpoint.memory import MemorySaver
 
 ORG = UUID("00000000-0000-0000-0000-000000000001")

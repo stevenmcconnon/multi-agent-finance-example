@@ -1,8 +1,8 @@
-# harness-rag
+# multi-agent-finance-example
 
 An artificial intelligence (AI) assistant over real company filings that only answers from what you are allowed to see, cites every answer, and asks a human before it acts.
 
-[![ci](https://github.com/stevenmcconnon/harness-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/stevenmcconnon/harness-rag/actions/workflows/ci.yml)
+[![ci](https://github.com/stevenmcconnon/multi-agent-finance-example/actions/workflows/ci.yml/badge.svg)](https://github.com/stevenmcconnon/multi-agent-finance-example/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB.svg)](pyproject.toml)
 [![terraform](https://img.shields.io/badge/terraform-1.6-7B42BC.svg)](infra/terraform)
@@ -26,7 +26,7 @@ then one section per block, then pointers into the code and the longer documents
 
 ## What this is
 
-harness-rag is a working demo of an AI assistant for a company's document library. The documents here
+multi-agent-finance-example is a working demo of an AI assistant for a company's document library. The documents here
 are real: the annual and quarterly reports that every public company in the United States must file with
 the Securities and Exchange Commission (SEC), for Apple and Microsoft. You sign in as one of three example
 employees, ask questions in plain English, and get answers with links to the exact pages they came from.
@@ -100,7 +100,7 @@ and Retrieval system (EDGAR) answers 403 to a request without an app name and e-
 
 ```sh
 cp .env.example .env
-# edit this line in .env:  EDGAR_USER_AGENT=harness-rag you@example.com
+# edit this line in .env:  EDGAR_USER_AGENT=multi-agent-finance-example you@example.com
 make up        # builds and starts everything (first run downloads images and models)
 make ingest    # AAPL and MSFT, 10-K and 8-K, newest 2 each, run inline inside the api container
 ```
@@ -120,7 +120,7 @@ the header has a persona switcher.
 - [ ] Click **Replay this turn**; open **Documents** as alice, then as bob
 
 Same tools over the Model Context Protocol (MCP), same door (needs `uv`):
-`HR_TOKEN=$(uv run python -m harness_rag.harness.devtoken alice) uv run python -m harness_rag.mcp_server.server`.
+`HR_TOKEN=$(uv run python -m finance_agents.harness.devtoken alice) uv run python -m finance_agents.mcp_server.server`.
 Write tools are listed for an admin but answer `approval_required`: approval happens only in the UI.
 
 ## How it works, in one screen
@@ -173,8 +173,8 @@ Policy decisions ("may this principal answer, may they call this tool") are Ceda
 evaluated in process locally and by Amazon Verified Permissions in cloud mode
 ([ADR 0002](docs/adr/0002-cedar-for-authorization.md)). Threat model: [docs/SECURITY.md](docs/SECURITY.md).
 
-**Where in the code:** `services/harness_rag/harness/identity.py` (token → Principal),
-`services/harness_rag/authz/` (Cedar, group cache, audit), `services/harness_rag/retrieval/sql.py`
+**Where in the code:** `services/finance_agents/harness/identity.py` (token → Principal),
+`services/finance_agents/authz/` (Cedar, group cache, audit), `services/finance_agents/retrieval/sql.py`
 (`ACL_PREDICATE`), `db/policies/*.cedar`, `db/migrations/0001_schema.sql` (`principals`, `group_members`,
 `document_acl`).
 
@@ -198,7 +198,7 @@ the better answer). The same activities run inline without Temporal (`cli run --
 `make ingest` works. JSON is JavaScript Object Notation. Each filing's ACL rows are assigned by form type
 in `ingest/acl.py`; why EDGAR is the corpus at all is [ADR 0004](docs/adr/0004-edgar-as-the-corpus.md).
 
-**Where in the code:** `services/harness_rag/ingest/` (`edgar.py` fetch, `parse.py` sections and chunks,
+**Where in the code:** `services/finance_agents/ingest/` (`edgar.py` fetch, `parse.py` sections and chunks,
 `facts.py` XBRL, `acl.py`, `writer.py` one transaction per filing, `workflow.py` and `worker.py` Temporal,
 `cli.py`).
 
@@ -225,9 +225,9 @@ Yes: this project creates embeddings and keeps them in a vector database, and th
   nearest authorized chunks by cosine distance, and the result is fused with the keyword list described
   under [Retrieval](#retrieval).
 
-**Where in the code:** `services/harness_rag/retrieval/embed.py` (both embedders, `EMBED_DIM = 512`),
-`services/harness_rag/ingest/parse.py` (`chunk(size=700, overlap=80)`), `db/migrations/0001_schema.sql`
-(`chunks`, `chunks_embedding_idx`, `chunks_tsv_idx`), `services/harness_rag/retrieval/sql.py` (`DENSE_SQL`,
+**Where in the code:** `services/finance_agents/retrieval/embed.py` (both embedders, `EMBED_DIM = 512`),
+`services/finance_agents/ingest/parse.py` (`chunk(size=700, overlap=80)`), `db/migrations/0001_schema.sql`
+(`chunks`, `chunks_embedding_idx`, `chunks_tsv_idx`), `services/finance_agents/retrieval/sql.py` (`DENSE_SQL`,
 `SPARSE_SQL`).
 
 ## Retrieval
@@ -279,8 +279,8 @@ The human-in-the-loop `interrupt()` sits inside `act`, before a write or money c
 resumes it. With `HR_MODEL_BACKEND=fake` the plan is a deterministic heuristic. SPA is single-page
 application; SSE is server-sent events.
 
-**Where in the code:** `services/harness_rag/retrieval/` (`sql.py`, `hybrid.py`, `rerank.py`, `facts.py`),
-`services/harness_rag/harness/tools/search_documents.py`, `services/harness_rag/harness/runner.py`.
+**Where in the code:** `services/finance_agents/retrieval/` (`sql.py`, `hybrid.py`, `rerank.py`, `facts.py`),
+`services/finance_agents/harness/tools/search_documents.py`, `services/finance_agents/harness/runner.py`.
 
 ## The agent team
 
@@ -339,9 +339,9 @@ resumable after a human), Temporal runs ingestion (minutes to hours, retried wit
 neither is used for the other's job. Architecture decision record (ADR)
 [0008](docs/adr/0008-model-driven-tool-selection.md) covers the model-driven plan.
 
-**Where in the code:** `services/harness_rag/agent/graph.py` (the graph), `services/harness_rag/agent/team.py`
-(agent names and kinds), `services/harness_rag/harness/` (`registry.py`, `runner.py`, `budget.py`, `tools/`),
-`services/harness_rag/gateway/` (the four model calls).
+**Where in the code:** `services/finance_agents/agent/graph.py` (the graph), `services/finance_agents/agent/team.py`
+(agent names and kinds), `services/finance_agents/harness/` (`registry.py`, `runner.py`, `budget.py`, `tools/`),
+`services/finance_agents/gateway/` (the four model calls).
 
 ## Human approval and replay
 
@@ -353,8 +353,8 @@ tool twice, and the MCP server and the HTTP API never pass `approved=True` at al
 checkpoint to Postgres (`AsyncPostgresSaver`; `MemorySaver` in tests), which is what the Replay page lists,
 and `_assert_owner` keeps replay, resume and continuation to the principal who started the thread.
 
-**Where in the code:** `services/harness_rag/agent/graph.py` (`interrupt`, `approve`, `_assert_owner`),
-`services/harness_rag/harness/runner.py` (`approved`, idempotency, `IN_PROGRESS_WAIT_S`), `apps/web/src`
+**Where in the code:** `services/finance_agents/agent/graph.py` (`interrupt`, `approve`, `_assert_owner`),
+`services/finance_agents/harness/runner.py` (`approved`, idempotency, `IN_PROGRESS_WAIT_S`), `apps/web/src`
 (approval card, Replay page), `db/migrations/0001_schema.sql` (`idempotency_keys`).
 
 ## Models used
@@ -374,8 +374,8 @@ The gateway modules and `embed.py` / `rerank.py` are the only code that speaks t
 (`tests/test_architecture.py` keeps `boto3` behind them). If the Bedrock planner call fails, the plan falls
 back to the fake heuristic.
 
-**Where in the code:** `services/harness_rag/config.py` (model ids), `services/harness_rag/gateway/`
-(`bedrock.py`, `fake.py`), `services/harness_rag/retrieval/embed.py`, `services/harness_rag/retrieval/rerank.py`.
+**Where in the code:** `services/finance_agents/config.py` (model ids), `services/finance_agents/gateway/`
+(`bedrock.py`, `fake.py`), `services/finance_agents/retrieval/embed.py`, `services/finance_agents/retrieval/rerank.py`.
 
 ## Observability and audit
 
@@ -389,7 +389,7 @@ metrics at `/metrics`. A collector that is down costs dropped spans, not a faile
 collector sidecar fans out to X-Ray or Tempo with sampling; in this demo every span is exported, because the
 traffic is one developer.
 
-**Where in the code:** `services/harness_rag/authz/audit.py`, `services/harness_rag/observability/otel.py`,
+**Where in the code:** `services/finance_agents/authz/audit.py`, `services/finance_agents/observability/otel.py`,
 `infra/otel/` (collector config), `infra/grafana/`, `db/migrations/0001_schema.sql` (`audit_events`).
 
 ## Infrastructure (local vs cloud)
@@ -400,13 +400,13 @@ traffic is one developer.
 
 | Layer | Folder | Role |
 |---|---|---|
-| L7 Experience | `apps/web`, `services/harness_rag/api`, `services/harness_rag/mcp_server` | React (Vite) SPA; FastAPI streaming SSE; MCP server over the same tools |
-| L6 Orchestration | `services/harness_rag/agent`, `ingest/workflow.py` | `graph.py` (the Supervisor graph, LangGraph); the Temporal ingestion workflow |
-| L5 AI Harness | `services/harness_rag/harness` | `identity.py`, `registry.py`, `runner.py` (the one tool door), `budget.py`, `tools/` |
-| L4 Knowledge / Retrieval | `services/harness_rag/retrieval`, `services/harness_rag/authz` | `sql.py` (the predicate), `hybrid.py`, `facts.py`; `cedar_local.py`, `group_cache.py`, `audit.py` |
-| L3 Models | `services/harness_rag/gateway`, `retrieval/embed.py`, `retrieval/rerank.py` | `bedrock.py`, `fake.py`; the only modules that speak to a model vendor |
-| L2 Data / Pipelines | `services/harness_rag/ingest` | `edgar.py`, `parse.py`, `facts.py`, `writer.py` (one transaction per filing) |
-| L1 Cloud / Platform | `infra/terraform`, `infra/otel`, `infra/grafana`, `services/harness_rag/observability` | `envs/dev/main.tf`; collector config; `otel.py` |
+| L7 Experience | `apps/web`, `services/finance_agents/api`, `services/finance_agents/mcp_server` | React (Vite) SPA; FastAPI streaming SSE; MCP server over the same tools |
+| L6 Orchestration | `services/finance_agents/agent`, `ingest/workflow.py` | `graph.py` (the Supervisor graph, LangGraph); the Temporal ingestion workflow |
+| L5 AI Harness | `services/finance_agents/harness` | `identity.py`, `registry.py`, `runner.py` (the one tool door), `budget.py`, `tools/` |
+| L4 Knowledge / Retrieval | `services/finance_agents/retrieval`, `services/finance_agents/authz` | `sql.py` (the predicate), `hybrid.py`, `facts.py`; `cedar_local.py`, `group_cache.py`, `audit.py` |
+| L3 Models | `services/finance_agents/gateway`, `retrieval/embed.py`, `retrieval/rerank.py` | `bedrock.py`, `fake.py`; the only modules that speak to a model vendor |
+| L2 Data / Pipelines | `services/finance_agents/ingest` | `edgar.py`, `parse.py`, `facts.py`, `writer.py` (one transaction per filing) |
+| L1 Cloud / Platform | `infra/terraform`, `infra/otel`, `infra/grafana`, `services/finance_agents/observability` | `envs/dev/main.tf`; collector config; `otel.py` |
 
 Locally, `docker-compose.yml` runs the whole stack on one laptop ([Run it yourself](#run-it-yourself)).
 
@@ -524,16 +524,16 @@ file-by-file detail.
 
 | Folder | Role | README |
 |---|---|---|
-| `services/harness_rag/agent` | the Supervisor graph and the agent team | [README](services/harness_rag/agent/README.md) |
-| `services/harness_rag/harness` | identity, tool registry, the one tool door, budgets, tools | [README](services/harness_rag/harness/README.md) |
-| `services/harness_rag/retrieval` | the predicate, hybrid search, embedders, rerankers, facts | [README](services/harness_rag/retrieval/README.md) |
-| `services/harness_rag/authz` | Cedar (local and Verified Permissions), group cache, audit | [README](services/harness_rag/authz/README.md) |
-| `services/harness_rag/gateway` | the model gateway: Bedrock and the deterministic fake | [README](services/harness_rag/gateway/README.md) |
-| `services/harness_rag/ingest` | EDGAR fetch, parse, XBRL facts, ACLs, writer, Temporal workflow | [README](services/harness_rag/ingest/README.md) |
-| `services/harness_rag/api` | FastAPI: `/chat` SSE stream, documents, replay, dev token | [README](services/harness_rag/api/README.md) |
-| `services/harness_rag/mcp_server` | the same tools over MCP | [README](services/harness_rag/mcp_server/README.md) |
-| `services/harness_rag/observability` | OpenTelemetry, Phoenix, Prometheus | [README](services/harness_rag/observability/README.md) |
-| `services/harness_rag/{contracts,interfaces,config,db}.py` | typed contracts, ports, settings, the Postgres door | |
+| `services/finance_agents/agent` | the Supervisor graph and the agent team | [README](services/finance_agents/agent/README.md) |
+| `services/finance_agents/harness` | identity, tool registry, the one tool door, budgets, tools | [README](services/finance_agents/harness/README.md) |
+| `services/finance_agents/retrieval` | the predicate, hybrid search, embedders, rerankers, facts | [README](services/finance_agents/retrieval/README.md) |
+| `services/finance_agents/authz` | Cedar (local and Verified Permissions), group cache, audit | [README](services/finance_agents/authz/README.md) |
+| `services/finance_agents/gateway` | the model gateway: Bedrock and the deterministic fake | [README](services/finance_agents/gateway/README.md) |
+| `services/finance_agents/ingest` | EDGAR fetch, parse, XBRL facts, ACLs, writer, Temporal workflow | [README](services/finance_agents/ingest/README.md) |
+| `services/finance_agents/api` | FastAPI: `/chat` SSE stream, documents, replay, dev token | [README](services/finance_agents/api/README.md) |
+| `services/finance_agents/mcp_server` | the same tools over MCP | [README](services/finance_agents/mcp_server/README.md) |
+| `services/finance_agents/observability` | OpenTelemetry, Phoenix, Prometheus | [README](services/finance_agents/observability/README.md) |
+| `services/finance_agents/{contracts,interfaces,config,db}.py` | typed contracts, ports, settings, the Postgres door | |
 | `apps/web` | the React SPA | [README](apps/web/README.md) |
 | `db/migrations`, `db/policies` | `0001_schema.sql`, `0002_seed_dev.sql`; `documents.cedar`, `tools.cedar` | [README](db/README.md) |
 | `infra` | Terraform modules and `envs/dev`, collector config, Grafana | [README](infra/README.md) |

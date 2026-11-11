@@ -39,5 +39,5 @@ The Cedar policies that decide who may do what. Cedar is Amazon's policy languag
 
 ## Read next
 
-- [`../../services/harness_rag/authz/README.md`](../../services/harness_rag/authz/README.md).
+- [`../../services/finance_agents/authz/README.md`](../../services/finance_agents/authz/README.md).
 - [`../../docs/adr/0002-cedar-for-authorization.md`](../../docs/adr/0002-cedar-for-authorization.md).

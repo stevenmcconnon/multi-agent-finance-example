@@ -1,6 +1,6 @@
 {
-  "title": "harness-rag API",
-  "uid": "harness-rag-api",
+  "title": "multi-agent-finance-example API",
+  "uid": "multi-agent-finance-api",
   "schemaVersion": 39,
   "time": { "from": "now-1h", "to": "now" },
   "panels": [

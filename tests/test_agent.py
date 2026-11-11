@@ -7,14 +7,14 @@ from datetime import date
 from uuid import UUID
 
 import pytest
-from harness_rag.agent import graph, team
-from harness_rag.agent.graph import approve, replay, run_turn, stream_turn
-from harness_rag.authz import audit
-from harness_rag.contracts import Chunk, Fact, ModelRole, Principal, RetrievalResult, ToolCall
-from harness_rag.gateway import ABSTAIN_TEXT, FakeGateway
-from harness_rag.harness import runner
-from harness_rag.harness.registry import ToolRegistry
-from harness_rag.harness.tools import CalculatorTool, CreateTicketTool, FactsSqlTool, SearchDocumentsTool
+from finance_agents.agent import graph, team
+from finance_agents.agent.graph import approve, replay, run_turn, stream_turn
+from finance_agents.authz import audit
+from finance_agents.contracts import Chunk, Fact, ModelRole, Principal, RetrievalResult, ToolCall
+from finance_agents.gateway import ABSTAIN_TEXT, FakeGateway
+from finance_agents.harness import runner
+from finance_agents.harness.registry import ToolRegistry
+from finance_agents.harness.tools import CalculatorTool, CreateTicketTool, FactsSqlTool, SearchDocumentsTool
 from langgraph.checkpoint.memory import MemorySaver
 
 ORG = UUID("00000000-0000-0000-0000-000000000001")

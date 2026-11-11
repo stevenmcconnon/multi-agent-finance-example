@@ -1,17 +1,17 @@
 # services/
 
-The Python backend: one package, `harness_rag`, plus the Docker image that runs it. It spans layers L2 to L6 (data, models, retrieval, harness, orchestration) and the API edge for L7.
+The Python backend: one package, `finance_agents`, plus the Docker image that runs it. It spans layers L2 to L6 (data, models, retrieval, harness, orchestration) and the API edge for L7.
 
 ## Files
 
 | File | What it owns |
 |---|---|
 | `Dockerfile` | Builds the `api` image. Build context is the repo root so `db/migrations` ships next to the package. |
-| `harness_rag/` | The package. See its [README](harness_rag/README.md). |
+| `finance_agents/` | The package. See its [README](finance_agents/README.md). |
 
 ## How it is used
 
-`docker compose up` (via `make up`) builds this image and starts `uvicorn harness_rag.api.app:app`. The same image also runs the ingest CLI (`python -m harness_rag.ingest.cli`) and the Temporal worker.
+`docker compose up` (via `make up`) builds this image and starts `uvicorn finance_agents.api.app:app`. The same image also runs the ingest CLI (`python -m finance_agents.ingest.cli`) and the Temporal worker.
 
 ## Rules that hold here
 
@@ -25,5 +25,5 @@ In this demo: the model downloads on first embed, because baking about 130 MB in
 
 ## Read next
 
-- [`harness_rag/README.md`](harness_rag/README.md), the package map.
+- [`finance_agents/README.md`](finance_agents/README.md), the package map.
 - [`../docs/TOUR.md`](../docs/TOUR.md), the request-order code walk.

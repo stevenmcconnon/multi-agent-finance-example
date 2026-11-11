@@ -10,13 +10,13 @@ import sys
 
 import anyio
 import pytest
-from harness_rag.harness.devtoken import mint
+from finance_agents.harness.devtoken import mint
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 
 def _db_reachable() -> bool:
-    from harness_rag import db
+    from finance_agents import db
 
     try:
         return asyncio.run(db.ping(os.environ.get("DATABASE_URL")))
@@ -28,7 +28,7 @@ def _corpus_loaded() -> bool:
     """CI has the schema and seed but no filings; the search assertions need `make ingest` to have run."""
     import asyncio
 
-    from harness_rag import db
+    from finance_agents import db
 
     async def count() -> int:
         rows = await db.fetch("SELECT count(*) AS n FROM documents", {})
@@ -49,7 +49,7 @@ TIMEOUT_S = 120  # the first search loads the embedding models
 
 def _params(user: str) -> StdioServerParameters:
     env = {**os.environ, "HR_TOKEN": mint(user), "OTEL_SDK_DISABLED": "true"}
-    return StdioServerParameters(command=sys.executable, args=["-m", "harness_rag.mcp_server.server"], env=env)
+    return StdioServerParameters(command=sys.executable, args=["-m", "finance_agents.mcp_server.server"], env=env)
 
 
 def _payload(result) -> dict:

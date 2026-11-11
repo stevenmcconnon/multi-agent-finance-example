@@ -9,9 +9,9 @@ from uuid import UUID
 import pytest
 
 os.environ.setdefault("OTEL_SDK_DISABLED", "true")  # no span exporters during tests
-from harness_rag.authz import audit
-from harness_rag.contracts import Chunk, Fact, Principal, RetrievalRequest, RetrievalResult
-from harness_rag.harness import runner
+from finance_agents.authz import audit
+from finance_agents.contracts import Chunk, Fact, Principal, RetrievalRequest, RetrievalResult
+from finance_agents.harness import runner
 
 ORG = UUID("00000000-0000-0000-0000-000000000001")
 ALICE = Principal(user_id="alice", org_id=ORG, org_slug="acme", groups=["finance", "analysts"], roles=["analyst"])

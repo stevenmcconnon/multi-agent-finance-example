@@ -34,7 +34,7 @@ Authority is the original document (S3 in production, EDGAR here). Search is thi
 
 ## How it is used
 
-`python -m harness_rag.ingest.cli migrate` (or API boot) runs `run_migrations()`: files apply in numeric order, each in a transaction, and re-runs do nothing.
+`python -m finance_agents.ingest.cli migrate` (or API boot) runs `run_migrations()`: files apply in numeric order, each in a transaction, and re-runs do nothing.
 
 ## Rules that hold here
 
@@ -45,5 +45,5 @@ Authority is the original document (S3 in production, EDGAR here). Search is thi
 
 ## Read next
 
-- [`../services/harness_rag/retrieval/README.md`](../services/harness_rag/retrieval/README.md).
+- [`../services/finance_agents/retrieval/README.md`](../services/finance_agents/retrieval/README.md).
 - [`../docs/adr/0001-pgvector-over-opensearch.md`](../docs/adr/0001-pgvector-over-opensearch.md).

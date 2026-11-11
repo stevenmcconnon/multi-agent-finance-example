@@ -48,7 +48,7 @@ export default function Nav() {
     <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2 px-4 py-2 text-sm">
         <Link to="/" className="mr-2 font-semibold tracking-tight">
-          Harness RAG
+          Multi-Agent Finance
         </Link>
         {me && link("/chat", "Chat")}
         {me && link("/documents", "Documents")}

@@ -26,8 +26,8 @@ jobs:
       - run: uv sync --frozen --extra dev
       - run: uv run ruff format --check services tests evals
       - run: uv run ruff check .
-      - run: uv run mypy services/harness_rag
-      - run: uv run python -m harness_rag.ingest.cli migrate
+      - run: uv run mypy services/finance_agents
+      - run: uv run python -m finance_agents.ingest.cli migrate
       - run: uv run pytest tests
 
   web:

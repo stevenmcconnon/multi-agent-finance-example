@@ -6,8 +6,8 @@ goes, and it lets the owner narrate the system by clicking through it.
 
 ## 1. Token -> Principal
 
-`services/harness_rag/api/app.py` `current_principal` reads the `Authorization: Bearer` header (a JSON Web Token (JWT)) and calls
-`services/harness_rag/harness/identity.py` `verify_token`. `decode_claims` verifies the signature, `exp` (required) and,
+`services/finance_agents/api/app.py` `current_principal` reads the `Authorization: Bearer` header (a JSON Web Token (JWT)) and calls
+`services/finance_agents/harness/identity.py` `verify_token`. `decode_claims` verifies the signature, `exp` (required) and,
 for Cognito, issuer, audience and `token_use` (a shared-secret signature (HS256) with a dev secret locally; a public-key signature (RS256) checked against the JSON Web Key Set (JWKS) on Amazon Web Services (AWS));
 `identity_from_claims` takes `cognito:username` and the `org:<slug>` group there, `sub` and `org` locally. Then the important
 line: groups and roles come from `GroupCache.get(org_id, sub)`, which resolves from `principals` and
@@ -39,7 +39,7 @@ coarse question and the tools.
 
 ## 3. The SQL predicate
 
-`services/harness_rag/retrieval/sql.py` `ACL_PREDICATE`: an `EXISTS` over `document_acl` joined to
+`services/finance_agents/retrieval/sql.py` `ACL_PREDICATE`: an `EXISTS` over `document_acl` joined to
 `principals`, matching the caller's user id or any of the caller's group names, in the caller's org.
 `SCOPE_PREDICATE` adds `c.org_id = %(org)s AND d.deleted_at IS NULL`. It is spliced into `DENSE_SQL`,
 `SPARSE_SQL` and `FACTS_SQL` in the `WHERE`, before `ORDER BY` and `LIMIT`. `acl_params(principal)` is the

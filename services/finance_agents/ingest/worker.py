@@ -1,4 +1,4 @@
-"""Temporal worker on task queue `ingest`: `uv run python -m harness_rag.ingest.cli worker`.
+"""Temporal worker on task queue `ingest`: `uv run python -m finance_agents.ingest.cli worker`.
 
 In production: this worker runs as a Fargate service against Temporal Cloud (or a self-hosted cluster).
 In this demo: one process against `temporal server start-dev`, because the sample needs no fleet.

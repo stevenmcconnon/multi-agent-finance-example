@@ -209,7 +209,7 @@ resource "aws_ecs_task_definition" "api" {
     image     = local.api_image
     essential = true
     # Migrations run on boot; db.run_migrations takes an advisory lock so two replicas cannot race.
-    command          = ["sh", "-c", "python -m harness_rag.ingest.cli migrate && uvicorn harness_rag.api.app:app --host 0.0.0.0 --port 8000"]
+    command          = ["sh", "-c", "python -m finance_agents.ingest.cli migrate && uvicorn finance_agents.api.app:app --host 0.0.0.0 --port 8000"]
     portMappings     = [{ name = "http", containerPort = 8000, protocol = "tcp" }]
     environment      = local.app_environment
     secrets          = local.app_secrets
@@ -236,7 +236,7 @@ resource "aws_ecs_task_definition" "ingest_worker" {
     name             = "ingest-worker"
     image            = local.api_image
     essential        = true
-    command          = ["python", "-m", "harness_rag.ingest.cli", "worker"]
+    command          = ["python", "-m", "finance_agents.ingest.cli", "worker"]
     environment      = local.app_environment
     secrets          = local.app_secrets
     logConfiguration = local.log_config["ingest-worker"]

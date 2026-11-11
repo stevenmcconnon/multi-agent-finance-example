@@ -1,4 +1,4 @@
-# harness_rag/
+# finance_agents/
 
 The whole backend package: it answers questions over permissioned documents, and every layer from L2 Data to L6 Orchestration lives in a sub-folder here.
 

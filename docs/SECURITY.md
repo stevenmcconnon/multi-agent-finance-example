@@ -142,4 +142,4 @@ at `/healthz`. Test: `tests/test_api.py::test_healthz_is_503_when_the_db_is_down
 
 ## Reporting
 
-Open a GitHub issue on `stevenmcconnon/harness-rag`. This is a sample project with no production tenants.
+Open a GitHub issue on `stevenmcconnon/multi-agent-finance-example`. This is a sample project with no production tenants.

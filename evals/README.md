@@ -4,7 +4,7 @@ Two pytest suites that run offline on every continuous integration (CI) run, and
 
 ## Suites (`uv run pytest evals/suites -q`)
 
-Both suites run the real turn graph (`harness_rag.agent.graph`), the real tool door (`harness.runner`), the
+Both suites run the real turn graph (`finance_agents.agent.graph`), the real tool door (`harness.runner`), the
 real Cedar policies and the `FakeGateway`, with `MemorySaver` checkpoints. `suites/corpus.py` replaces the
 two Structured Query Language (SQL)-backed stores with `FakeRetriever` and `FakeFactStore` over a five-document fixture (Apple (AAPL) and Microsoft (MSFT)
 Form 10-K (annual report) and Form 8-K (current report) filings in org `acme`, one document in another org). The fakes apply the same org + reader-group

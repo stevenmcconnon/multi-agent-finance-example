@@ -1,4 +1,4 @@
--- harness-rag control plane + search. Store by purpose:
+-- multi-agent-finance-example control plane + search. Store by purpose:
 --   Authority = S3 originals (sharepoint stand-in); Search = this pgvector/tsvector index;
 --   Control = checkpoints/jobs/audit/evals/idempotency; Acceleration = Redis (not here).
 CREATE EXTENSION IF NOT EXISTS vector;

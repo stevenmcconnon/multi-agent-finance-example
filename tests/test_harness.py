@@ -7,13 +7,13 @@ import time
 from uuid import UUID
 
 import pytest
-from harness_rag.authz import audit
-from harness_rag.contracts import Principal, RiskLevel, ToolCall, ToolResult, ToolSpec
-from harness_rag.harness import runner
-from harness_rag.harness.budget import BudgetExceeded, TurnBudget
-from harness_rag.harness.registry import ToolRegistry
-from harness_rag.harness.runner import TransientError, run_tool
-from harness_rag.harness.tools import CalculatorTool, FactsSqlTool
+from finance_agents.authz import audit
+from finance_agents.contracts import Principal, RiskLevel, ToolCall, ToolResult, ToolSpec
+from finance_agents.harness import runner
+from finance_agents.harness.budget import BudgetExceeded, TurnBudget
+from finance_agents.harness.registry import ToolRegistry
+from finance_agents.harness.runner import TransientError, run_tool
+from finance_agents.harness.tools import CalculatorTool, FactsSqlTool
 
 ORG = UUID("00000000-0000-0000-0000-000000000001")
 ALICE = Principal(user_id="alice", org_id=ORG, org_slug="acme", groups=["finance", "analysts"], roles=["analyst"])

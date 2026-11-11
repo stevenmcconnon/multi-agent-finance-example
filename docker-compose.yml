@@ -63,7 +63,7 @@ services:
 
   api:
     <<: *app
-    command: ["sh", "-c", "python -m harness_rag.ingest.cli migrate && uvicorn harness_rag.api.app:app --host 0.0.0.0 --port 8000"]
+    command: ["sh", "-c", "python -m finance_agents.ingest.cli migrate && uvicorn finance_agents.api.app:app --host 0.0.0.0 --port 8000"]
     ports: ["8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -73,7 +73,7 @@ services:
   # `docker compose --profile temporal up` runs ingestion through Temporal instead of inline.
   ingest-worker:
     <<: *app
-    command: ["python", "-m", "harness_rag.ingest.cli", "worker"]
+    command: ["python", "-m", "finance_agents.ingest.cli", "worker"]
     profiles: [temporal]
     depends_on:
       postgres: { condition: service_healthy }

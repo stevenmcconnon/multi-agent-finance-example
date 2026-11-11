@@ -1,6 +1,6 @@
 # S3 + CloudFront (origin access control) for the Vite SPA: `pnpm build` -> apps/web/dist, synced here.
 # In production: the same dist/ behind CloudFront with a custom domain + WAF, or the nginx image
-#   (apps/web/Dockerfile, in ECR as harness-rag-web) on Fargate when the UI needs server logic.
+#   (apps/web/Dockerfile, in ECR as multi-agent-finance-example-web) on Fargate when the UI needs server logic.
 # In this demo: a bucket + CloudFront with the default certificate, because it is ~$1/month and
 #   the UI is a static client that only talks to the API over HTTPS.
 resource "aws_s3_bucket" "web" {

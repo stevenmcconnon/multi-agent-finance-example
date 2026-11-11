@@ -15,11 +15,11 @@ The L2 Data layer: Securities and Exchange Commission (SEC) EDGAR filings into P
 | `workflow.py` | Temporal activities, `IngestFilingWorkflow`, `DiscoverWorkflow`, and `ingest_inline`. |
 | `worker.py` | Temporal worker on task queue `ingest`. |
 | `cli.py` | `run`, `worker`, `migrate` commands. |
-| `__main__.py` | Lets `python -m harness_rag.ingest` run the CLI. |
+| `__main__.py` | Lets `python -m finance_agents.ingest` run the CLI. |
 
 ## How it is used
 
-`make ingest` runs `python -m harness_rag.ingest.cli run --tickers AAPL,MSFT ...`, inline by default or through Temporal. The daily schedule in `infra/terraform/modules/schedule` runs the same CLI.
+`make ingest` runs `python -m finance_agents.ingest.cli run --tickers AAPL,MSFT ...`, inline by default or through Temporal. The daily schedule in `infra/terraform/modules/schedule` runs the same CLI.
 
 ## Rules that hold here
 

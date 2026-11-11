@@ -1,7 +1,7 @@
 # Architecture
 
-harness-rag is seven layers with one direction of dependency: a layer imports the typed contracts in
-`services/harness_rag/contracts.py`, the ports in `interfaces.py`, and the layers below it. Nothing imports
+multi-agent-finance-example is seven layers with one direction of dependency: a layer imports the typed contracts in
+`services/finance_agents/contracts.py`, the ports in `interfaces.py`, and the layers below it. Nothing imports
 upward. The README's stack diagram is the picture; this page is the text.
 
 ## Layers

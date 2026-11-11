@@ -1,6 +1,6 @@
 """Fixtures for the eval suites: the real LangGraph turn (MemorySaver, FakeGateway) over corpus.py's fake stores.
 
-What is real: harness_rag.agent.graph (nodes, routing, HITL interrupt), harness.runner.run_tool (Cedar,
+What is real: finance_agents.agent.graph (nodes, routing, HITL interrupt), harness.runner.run_tool (Cedar,
 idempotency, retries, breakers, audit), the Cedar policies in db/policies, the FakeGateway, MemorySaver.
 What is faked: the SQL (corpus.FakeRetriever / corpus.FakeFactStore apply the predicate of retrieval/sql.py in
 Python). tests/test_retrieval.py proves the SQL itself.
@@ -12,12 +12,12 @@ from typing import Any
 
 import pytest
 from corpus import FakeFactStore, FakeRetriever
-from harness_rag.agent import graph
-from harness_rag.authz import audit
-from harness_rag.gateway import FakeGateway
-from harness_rag.harness import runner
-from harness_rag.harness.registry import ToolRegistry
-from harness_rag.harness.tools import CalculatorTool, CreateTicketTool, FactsSqlTool, SearchDocumentsTool
+from finance_agents.agent import graph
+from finance_agents.authz import audit
+from finance_agents.gateway import FakeGateway
+from finance_agents.harness import runner
+from finance_agents.harness.registry import ToolRegistry
+from finance_agents.harness.tools import CalculatorTool, CreateTicketTool, FactsSqlTool, SearchDocumentsTool
 from langgraph.checkpoint.memory import MemorySaver
 
 

@@ -13,7 +13,7 @@ Routes: `GET /healthz`, `POST /auth/dev-token`, `GET /me`, `POST /chat` (server-
 
 ## How it is used
 
-`uvicorn harness_rag.api.app:app --port 8000`. The web client in `apps/web` calls these routes. Each turn streams events whose SSE `event` is the `TurnEvent.type`.
+`uvicorn finance_agents.api.app:app --port 8000`. The web client in `apps/web` calls these routes. Each turn streams events whose SSE `event` is the `TurnEvent.type`.
 
 ## Rules that hold here
 

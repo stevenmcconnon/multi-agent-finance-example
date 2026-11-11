@@ -12,10 +12,10 @@ import uuid
 
 import pytest
 
-pytest.importorskip("harness_rag.agent.graph")
+pytest.importorskip("finance_agents.agent.graph")
 from corpus import DOCS_BY_ID, USERS, load_cases, may_read
-from harness_rag.agent import graph
-from harness_rag.gateway import ABSTAIN_TEXT
+from finance_agents.agent import graph
+from finance_agents.gateway import ABSTAIN_TEXT
 
 CASES = load_cases("qa.jsonl")
 

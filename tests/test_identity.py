@@ -11,8 +11,8 @@ import fakeredis.aioredis
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from harness_rag.authz.group_cache import GroupCache
-from harness_rag.harness import devtoken, identity
+from finance_agents.authz.group_cache import GroupCache
+from finance_agents.harness import devtoken, identity
 from jose import jwk, jwt
 
 ORG = UUID("00000000-0000-0000-0000-000000000001")

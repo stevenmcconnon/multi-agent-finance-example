@@ -28,13 +28,13 @@ class Settings(BaseSettings):
     hr_embed_backend: str = "fastembed"
     hr_rerank_backend: str = "fastembed"
 
-    edgar_user_agent: str = "harness-rag contact@example.com"
+    edgar_user_agent: str = "multi-agent-finance-example contact@example.com"
     temporal_address: str = "localhost:7233"
     temporal_namespace: str = "default"
     s3_raw_bucket: str = ""
 
     otel_exporter_otlp_endpoint: str = "http://localhost:4318"
-    otel_service_name: str = "harness-rag-api"
+    otel_service_name: str = "multi-agent-finance-api"
     phoenix_collector_endpoint: str = "http://localhost:6006"
 
     hr_turn_token_budget: int = 40000

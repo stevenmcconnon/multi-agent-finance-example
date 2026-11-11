@@ -1,6 +1,6 @@
 """MCP server over stdio: the registry's tools for the principal in HR_TOKEN, every call through run_tool.
 
-    HR_TOKEN=$(uv run python -m harness_rag.harness.devtoken alice) uv run python -m harness_rag.mcp_server.server
+    HR_TOKEN=$(uv run python -m finance_agents.harness.devtoken alice) uv run python -m finance_agents.mcp_server.server
 
 The token is verified by harness.identity (DB-backed groups), so a client never names its own roles; a
 tool the principal's roles cannot use is not even listed, and Cedar still decides inside run_tool.
@@ -54,7 +54,7 @@ def _bind(server: MCPServer, principal: Principal, spec: ToolSpec, registry: Too
 def build_server(principal: Principal, registry: ToolRegistry | None = None) -> MCPServer:
     registry = registry or default_registry()
     server = MCPServer(
-        "harness-rag",
+        "multi-agent-finance-example",
         instructions=f"Tools for {principal.user_id}@{principal.org_slug}; every call is policy-checked and audited.",
     )
     for spec in registry.specs_for(principal):
@@ -65,7 +65,7 @@ def build_server(principal: Principal, registry: ToolRegistry | None = None) -> 
 def main() -> None:
     token = os.environ.get("HR_TOKEN")
     if not token:
-        raise SystemExit("HR_TOKEN is required (uv run python -m harness_rag.harness.devtoken alice)")
+        raise SystemExit("HR_TOKEN is required (uv run python -m finance_agents.harness.devtoken alice)")
     principal = asyncio.run(verify_token(token))
     build_server(principal).run("stdio")
 

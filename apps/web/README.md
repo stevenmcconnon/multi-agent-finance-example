@@ -1,4 +1,4 @@
-# apps/web — Harness RAG UI
+# apps/web — Multi-Agent Finance UI
 
 Vite + React 19 SPA (TypeScript strict, Tailwind v4, Zod, react-router). Talks only to the FastAPI service in `docs/CONTRACTS.md`; every payload is Zod-validated in `src/lib/schemas.ts`. No SSR, no server routes: `dist/` is static files.
 
@@ -14,7 +14,7 @@ pnpm dev          # http://localhost:3000, API at VITE_API_URL
 
 ```sh
 pnpm test && pnpm lint && pnpm build && pnpm preview   # test = node --test on the SSE framer; build = tsc -b && vite build -> dist/
-docker build -t harness-rag-web --build-arg VITE_API_URL=http://api:8000 .   # nginx:alpine serving dist/ on :3000 with SPA fallback
+docker build -t multi-agent-finance-example-web --build-arg VITE_API_URL=http://api:8000 .   # nginx:alpine serving dist/ on :3000 with SPA fallback
 ```
 
 ## Deploy (S3 + CloudFront)

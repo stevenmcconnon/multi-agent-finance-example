@@ -1,4 +1,4 @@
-// Zod mirrors of services/harness_rag/contracts.py and docs/CONTRACTS.md. Nobody redefines these.
+// Zod mirrors of services/finance_agents/contracts.py and docs/CONTRACTS.md. Nobody redefines these.
 import { z } from "zod";
 
 export const Principal = z.object({

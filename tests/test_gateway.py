@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from harness_rag.contracts import RiskLevel, ToolSpec
-from harness_rag.gateway import FakeGateway
-from harness_rag.gateway.bedrock import BedrockGateway
-from harness_rag.gateway.fake import understand_heuristic
+from finance_agents.contracts import RiskLevel, ToolSpec
+from finance_agents.gateway import FakeGateway
+from finance_agents.gateway.bedrock import BedrockGateway
+from finance_agents.gateway.fake import understand_heuristic
 
 SEARCH = ToolSpec(name="search_documents", description="search", input_schema={"type": "object"})
 FACTS = ToolSpec(name="facts_sql", description="facts", input_schema={"type": "object"})

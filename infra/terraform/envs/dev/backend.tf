@@ -4,7 +4,7 @@
 # terraform {
 #   backend "s3" {
 #     bucket         = "<state-bucket>"
-#     key            = "harness-rag/dev.tfstate"
+#     key            = "multi-agent-finance-example/dev.tfstate"
 #     region         = "us-east-1"
 #     dynamodb_table = "<lock-table>"
 #     encrypt        = true

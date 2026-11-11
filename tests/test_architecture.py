@@ -6,9 +6,9 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from harness_rag.retrieval import sql
+from finance_agents.retrieval import sql
 
-PKG = Path(__file__).resolve().parents[1] / "services" / "harness_rag"
+PKG = Path(__file__).resolve().parents[1] / "services" / "finance_agents"
 BOTO3_ALLOWED = {
     "gateway/bedrock.py",
     "retrieval/embed.py",
@@ -57,7 +57,7 @@ def test_every_chunk_or_fact_query_carries_the_acl_predicate():
 
 
 def test_documents_route_reuses_the_predicate():
-    from harness_rag.api import app as api
+    from finance_agents.api import app as api
 
     assert sql.ACL_PREDICATE in api.DOCUMENTS_SQL and "d.deleted_at IS NULL" in api.DOCUMENTS_SQL
 

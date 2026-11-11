@@ -19,8 +19,8 @@ exporters:
   #   (infra/terraform/modules/observability/adot.yaml), traces to X-Ray or Phoenix on Fargate.
   # In this demo: Phoenix + console only, because a laptop has no CloudWatch and the sample is $0.
   # awsemf:
-  #   namespace: harness-rag
-  #   log_group_name: /harness-rag/metrics
+  #   namespace: multi-agent-finance-example
+  #   log_group_name: /multi-agent-finance-example/metrics
 
 service:
   pipelines:

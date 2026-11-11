@@ -1,4 +1,4 @@
-"""Local dev tokens for the seeded identities. `uv run python -m harness_rag.harness.devtoken alice`.
+"""Local dev tokens for the seeded identities. `uv run python -m finance_agents.harness.devtoken alice`.
 The same `mint()` backs POST /auth/dev-token. Groups/roles in the token are a hint; the DB wins."""
 
 from __future__ import annotations

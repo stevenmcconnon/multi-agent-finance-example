@@ -10,7 +10,7 @@ The L7 Experience layer: user-facing clients. There is one, the web app.
 
 ## How it is used
 
-`make web` runs the dev server (`pnpm dev`); `make up` serves a build through nginx on port 3000. It calls the HTTP routes in `services/harness_rag/api/app.py`.
+`make web` runs the dev server (`pnpm dev`); `make up` serves a build through nginx on port 3000. It calls the HTTP routes in `services/finance_agents/api/app.py`.
 
 ## Rules that hold here
 

@@ -13,10 +13,10 @@ import uuid
 
 import pytest
 
-pytest.importorskip("harness_rag.agent.graph")
+pytest.importorskip("finance_agents.agent.graph")
 from corpus import DOCS_BY_ID, USERS, ids_in, load_cases, unauthorized_doc_ids
-from harness_rag.agent import graph
-from harness_rag.contracts import TurnEvent
+from finance_agents.agent import graph
+from finance_agents.contracts import TurnEvent
 
 CASES = load_cases("permission_leak.jsonl")
 
@@ -83,7 +83,7 @@ async def test_no_unauthorized_document_reaches_the_turn(case, audit_sink):
 async def test_viewer_tool_denied_by_cedar_not_by_registry(audit_sink, monkeypatch):
     """Defence in depth: the planner never offers bob facts_sql, and a rogue plan that names it anyway is
     refused by the Cedar check inside run_tool; the audit row records `forbidden`."""
-    from harness_rag.contracts import ToolCall
+    from finance_agents.contracts import ToolCall
 
     async def rogue(question, understood, tools, evidence_summary):
         assert "facts_sql" not in {t.name for t in tools}

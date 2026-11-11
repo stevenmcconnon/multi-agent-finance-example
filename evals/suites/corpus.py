@@ -1,6 +1,6 @@
 """The in-memory corpus and fake stores the eval suites run over.
 
-What is real: harness_rag.agent.graph (nodes, routing, HITL interrupt), harness.runner.run_tool (Cedar,
+What is real: finance_agents.agent.graph (nodes, routing, HITL interrupt), harness.runner.run_tool (Cedar,
 idempotency, retries, breakers, audit), the Cedar policies in db/policies, the FakeGateway, MemorySaver.
 What is faked: the SQL. `FakeRetriever` and `FakeFactStore` stand in for PgHybridRetriever / PgFactStore and
 apply the same org + reader-group predicate retrieval/sql.py applies in SQL, so the suites exercise every
@@ -15,9 +15,9 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid5
 
-from harness_rag.authz import audit
-from harness_rag.contracts import Chunk, Fact, Principal, RetrievalRequest, RetrievalResult
-from harness_rag.ingest.acl import groups_for
+from finance_agents.authz import audit
+from finance_agents.contracts import Chunk, Fact, Principal, RetrievalRequest, RetrievalResult
+from finance_agents.ingest.acl import groups_for
 
 DATASETS = Path(__file__).resolve().parents[1] / "datasets"
 ORG = UUID("00000000-0000-0000-0000-000000000001")  # acme (db/migrations/0002_seed_dev.sql)

@@ -1,6 +1,6 @@
 # Local loop: make up → make ingest → open http://localhost:3000
 TF_DEV := infra/terraform/envs/dev
-CLI    := docker compose exec api python -m harness_rag.ingest.cli
+CLI    := docker compose exec api python -m finance_agents.ingest.cli
 
 .PHONY: up down logs migrate seed ingest test lint web tf-validate tf-plan tf-destroy
 
@@ -25,7 +25,7 @@ test:
 	uv run pytest
 
 lint:
-	uv run ruff format --check services tests evals && uv run ruff check . && uv run mypy services/harness_rag
+	uv run ruff format --check services tests evals && uv run ruff check . && uv run mypy services/finance_agents
 	cd apps/web && pnpm lint
 
 web:

@@ -1,6 +1,6 @@
 """The HTTP API, exactly the routes in docs/CONTRACTS.md.
 
-    uv run uvicorn harness_rag.api.app:app --port 8000
+    uv run uvicorn finance_agents.api.app:app --port 8000
 
 Bearer JWT -> harness.identity.verify_token -> Principal (401 on any failure). Turns stream as SSE
 (`event` = TurnEvent.type, `data` = JSON). /documents reuses the retrieval ACL predicate verbatim.
@@ -57,7 +57,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await db.close_pool()
 
 
-app = FastAPI(title="harness-rag", lifespan=lifespan)
+app = FastAPI(title="multi-agent-finance-example", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.hr_cors_origins.split(","),

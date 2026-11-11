@@ -22,12 +22,12 @@ with workflow.unsafe.imports_passed_through():
     import structlog
 
     # full dotted imports: `from . import x` re-executes x inside the sandbox instead of passing it through
-    import harness_rag.ingest.edgar as edgar
-    import harness_rag.ingest.facts as facts
-    import harness_rag.ingest.jobs as jobs
-    import harness_rag.ingest.parse as parse
-    import harness_rag.ingest.writer as writer
-    from harness_rag.config import settings
+    import finance_agents.ingest.edgar as edgar
+    import finance_agents.ingest.facts as facts
+    import finance_agents.ingest.jobs as jobs
+    import finance_agents.ingest.parse as parse
+    import finance_agents.ingest.writer as writer
+    from finance_agents.config import settings
 
 log = structlog.get_logger(__name__)
 TASK_QUEUE = "ingest"

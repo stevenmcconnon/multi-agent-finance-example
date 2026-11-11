@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 820" width="1100" height="820" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
-<title>harness-rag: seven layers, local demo versus cloud mode</title>
-<text x="40" y="34" font-size="22" font-weight="600" fill="#6b7280">harness-rag — the seven layers</text>
+<title>multi-agent-finance-example: seven layers, local demo versus cloud mode</title>
+<text x="40" y="34" font-size="22" font-weight="600" fill="#6b7280">multi-agent-finance-example — the seven layers</text>
 <text x="40" y="54" font-size="13" fill="#6b7280">Each row: the layer, its folder, and what runs it. Only technologies present in the code or the Terraform are named.</text>
 <text x="350" y="86" font-size="14" font-weight="600" fill="#6b7280">Local demo (what `make up` runs)</text>
 <text x="725" y="86" font-size="14" font-weight="600" fill="#6b7280">Cloud mode (Terraform, not applied)</text>

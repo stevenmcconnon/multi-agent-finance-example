@@ -32,8 +32,8 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
       - name: build and push api
         run: |
-          docker build -f services/Dockerfile -t "$REGISTRY/harness-rag-api:$TAG" .
-          docker push "$REGISTRY/harness-rag-api:$TAG"
+          docker build -f services/Dockerfile -t "$REGISTRY/multi-agent-finance-api:$TAG" .
+          docker push "$REGISTRY/multi-agent-finance-api:$TAG"
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
       - name: build and push web
@@ -43,8 +43,8 @@ jobs:
             --build-arg VITE_COGNITO_DOMAIN="${{ vars.COGNITO_DOMAIN }}" \
             --build-arg VITE_COGNITO_CLIENT_ID="${{ vars.COGNITO_CLIENT_ID }}" \
             --build-arg VITE_REDIRECT_URI="${{ vars.WEB_URL }}/auth/callback" \
-            -t "$REGISTRY/harness-rag-web:$TAG" apps/web
-          docker push "$REGISTRY/harness-rag-web:$TAG"
+            -t "$REGISTRY/multi-agent-finance-example-web:$TAG" apps/web
+          docker push "$REGISTRY/multi-agent-finance-example-web:$TAG"
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
 
