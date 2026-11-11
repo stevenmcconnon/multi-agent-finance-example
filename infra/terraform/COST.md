@@ -1,7 +1,7 @@
 # What the dev environment costs
 
 Sizes are the ones in `modules/*`. Prices are us-east-1 list prices, rounded; nothing here was
-metered from a live run of this repo.
+metered from a live run of this repo, and the environment has not been applied.
 
 | Resource | Size | $/month |
 |---|---|---|
@@ -9,7 +9,7 @@ metered from a live run of this repo.
 | Fargate (serverless containers) | 4 tasks x 0.5 virtual CPU (vCPU) / 1 GB (api, temporal, phoenix, ingest-worker) | ~60 |
 | Application Load Balancer | 1, low traffic | ~18 |
 | ElastiCache Valkey | cache.t4g.micro, 1 node | ~12 |
-| Bedrock | Sonnet 4.5 + Haiku 4.5 + Titan embed + Cohere rerank + Guardrails, demo traffic | 10-30 |
+| Bedrock | Claude Sonnet 5.5 + Claude Haiku 5.5 + Titan embed + Cohere rerank + Guardrails, demo traffic | 10-30 |
 | CloudWatch logs/metrics, Virtual Private Cloud (VPC) interface endpoints (5 x ~$7), Secrets Manager, Elastic Container Registry (ECR), S3 storage with CloudFront | | ~15 + ~35 endpoints |
 | EventBridge Scheduler, Cognito (under 50k monthly active users, MAU), Verified Permissions (demo volume) | | ~0 |
 | **Total** | | **~$140-160 (closer to $175 with the five interface endpoints), about $5/day** |
@@ -29,7 +29,7 @@ make tf-destroy          # scripts/teardown.sh: empties the ECR repos, then `ter
 ```
 
 The RDS instance has `skip_final_snapshot = true` and the secret `recovery_window_in_days = 0`, so
-a destroy leaves nothing billing. Re-ingesting the Apple (AAPL) and Microsoft (MSFT) filings after a rebuild is `make ingest`.
+a destroy leaves nothing billing. Re-ingesting the Apple (AAPL) and Microsoft (MSFT) filings after a rebuild is the ingest command run as an Elastic Container Service (ECS) task; `make ingest` is the local stack's.
 
 ## User interface (UI) note
 

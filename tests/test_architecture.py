@@ -33,7 +33,7 @@ def _files() -> list[Path]:
 
 
 def test_boto3_only_behind_the_doors():
-    # ingest/ may reach S3/SQS directly (its queue and raw-store doors); every other AWS call has a named file.
+    # ingest/ may reach S3 directly (its raw-store door); every other AWS call has a named file.
     offenders = {str(p.relative_to(PKG)) for p in _files() if "boto3" in _imports(p)} - BOTO3_ALLOWED
     offenders = {o for o in offenders if not o.startswith("ingest/")}
     assert offenders == set(), f"boto3 imported outside its doors: {offenders}"

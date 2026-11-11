@@ -69,9 +69,10 @@ be alerted on. Tests: `tests/test_authz.py::test_authorizer_exception_fails_clos
 The ACL is not a rule the model follows; it is a Structured Query Language (SQL) `EXISTS` predicate on the principal's user id and
 group names, inside the `WHERE` of every candidate query (`retrieval/sql.py`), evaluated by Postgres before
 fusion and rerank. The model never sees a chunk that failed it, so no instruction in the prompt can surface
-one. `SearchDocumentsTool` refuses a retriever result not marked `acl_filtered`, and `agent/graph.py`
+one. `SearchDocumentsTool` refuses a retriever result not marked `acl_filtered`, and `agent/team.py` `evidence()`
 builds evidence only from tool results. Injected text can at most change the *query* and so which
-*authorized* chunks rank first. Tests: `tests/test_retrieval.py::test_acl_predicate_in_dense_and_sparse_and_facts`,
+*authorized* chunks rank first. The input guardrail tags the phrasing (`injection_suspected`, shown in the
+Safety check row and stored in the audit row) and does not block it. Tests: `tests/test_retrieval.py::test_acl_predicate_in_dense_and_sparse_and_facts`,
 `tests/test_architecture.py::test_every_chunk_or_fact_query_carries_the_acl_predicate`, the permission-leak suite.
 
 ### 5. Personal data and unsafe model content
@@ -88,7 +89,8 @@ limit and return 429 with `Retry-After`; Redis failure allows the authenticated 
 
 In cloud mode, the Terraform-managed Bedrock Guardrail adds content and prompt-attack filters, personal-data
 anonymization and a denied investment-advice topic to every model call and both ends of the turn. It is off
-in the $0 local stack. Pattern and managed-filter limits are documented rather than implied away in
+in the $0 local stack, and it has not been run live: the Terraform validates and the adapter is tested with a
+stubbed client, as are the Bedrock model, Cognito and Verified Permissions paths. Pattern and managed-filter limits are documented rather than implied away in
 [GUARDRAILS.md](GUARDRAILS.md). Tests: `tests/test_guardrails.py`,
 `tests/test_api.py::test_email_in_the_question_is_redacted_everywhere`,
 `::test_first_sse_event_tags_an_injection_without_blocking`, `::test_chat_is_429_after_the_limit`.
@@ -99,21 +101,24 @@ in the $0 local stack. Pattern and managed-filter limits are documented rather t
 hangs or flaps; a retried write runs twice; a client calls a tool the user interface (UI) hid.*
 
 Every tool call, from the agent, the API or MCP, goes through `harness/runner.py::run_tool`: Cedar
-`tool:<name>` on the caller's Org (`tools.cedar`: read tools need analyst or admin, write/money tools need
-admin; an explicit `forbid` for anything outside the caller's org); then a risk gate: a `write` or `money`
+`tool:<name>` on the caller's Org (`tools.cedar`, namespace `FinanceAgents`: read tools need analyst or admin, write tools need
+admin; an explicit `forbid` for anything outside the caller's org); then a risk gate: a `write`
 tool returns `approval_required` unless the caller passes `approved=True`, which only the graph does after a
 human approved at the `interrupt()` inside the `act` node, so MCP cannot run a write tool at all; then an
 idempotency reservation (`INSERT ... ON CONFLICT DO NOTHING RETURNING`, key `org:tool:<thread>:<tool>:<sha256(args)[:16]>`),
 so a resumed, retried or concurrent write runs once; then a per-tool timeout, Tenacity retries on transient
 errors only, and a pybreaker circuit breaker (five failures open it for thirty seconds). Hiding tools by role
 in `ToolRegistry.specs_for` is user experience (UX), and it is also what the planning model is shown; the policy is the
-enforcement, so a tool name the model invents or a caller forces is still refused. A denial is audited and
+enforcement, so a tool name the model invents or a caller forces is still refused. A request for a write
+tool the caller was not offered is sent to the door on purpose (`agent/team.py` `Researcher.door_calls`), so
+the refusal is Cedar's decision with an audit row and the reader is told "Your role (analyst) may not create
+tickets; that needs the admin role. Nothing was changed." A denial is audited and
 changes nothing. `TurnBudget` caps tokens, tool calls and wall time per
 turn. Tests: `tests/test_harness.py` (denied call, cached call, retry, breaker, budget),
 `tests/test_harness.py::test_write_tool_needs_explicit_approval`, `::test_concurrent_same_key_runs_the_tool_once`,
 `tests/test_mcp.py::test_carol_write_tool_over_mcp_needs_approval`,
 `tests/test_agent.py::test_planned_tool_outside_the_principals_registry_is_refused_by_cedar`,
-`::test_create_ticket_by_alice_is_forbidden_by_cedar`, `::test_create_ticket_declined_changes_nothing`.
+`::test_ticket_request_from_a_role_without_the_tool_is_refused_at_the_door`, `::test_create_ticket_declined_changes_nothing`.
 
 ### 7. Cross-tenant access
 
@@ -130,8 +135,9 @@ Thread ownership (`agent/graph.py::_assert_owner`) checks user *and* org. Tests:
 
 The `retrieval` audit row lists the document and chunk ids of what was *returned*, after the predicate; the
 `answer` row lists citations; tool rows record arguments and outcome, not retrieved text. Every audit string
-passes through the personal-data redactor. OpenTelemetry spans from `observability/otel.py` wrap FastAPI,
-psycopg and LangGraph nodes and carry no evidence text. The permission-leak suite walks every audit row and
+passes through the personal-data redactor. OpenTelemetry spans from `observability/otel.py` wrap FastAPI
+(health checks and `/metrics` excluded), psycopg and LangGraph nodes, plus one TOOL span per guarded tool call
+carrying the tool name, its arguments and "ok" or the error, never the retrieved text. The permission-leak suite walks every audit row and
 stream event for a forbidden document id. The retrieval query may be logged only after input redaction;
 the pattern-matching limits in `GUARDRAILS.md` still apply.
 

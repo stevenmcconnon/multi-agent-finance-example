@@ -3,25 +3,27 @@
 Types: `services/finance_agents/contracts.py`. Ports: `interfaces.py`. Settings: `config.py` (env names in `.env.example`).
 
 ## Agent entry points (`finance_agents.agent.graph`)
-- `async def run_turn(principal: Principal, question: str, thread_id: str) -> Answer`
+- `async def run_turn(principal: Principal, question: str, thread_id: str) -> Answer` (a turn suspended at the approval interrupt returns `reason: "approval_pending"`)
 - `async def stream_turn(principal: Principal, question: str, thread_id: str) -> AsyncIterator[TurnEvent]`
-- `async def approve(principal: Principal, thread_id: str, approved: bool, note: str | None) -> AsyncIterator[TurnEvent]` resumes a human in the loop (HITL) interrupt
+- `async def approve(principal: Principal, thread_id: str, approved: bool, note: str | None) -> AsyncIterator[TurnEvent]` resumes a human in the loop (HITL) interrupt; with none pending it yields `error {code: "nothing_pending"}`
 - `async def replay(principal: Principal, thread_id: str) -> list[dict]` checkpoints oldest→newest: `{checkpoint_id, step, node, state_summary, at}`
+- All four raise `PermissionError` when the thread belongs to another principal (the API answers 403).
 
-## Hypertext Transfer Protocol (HTTP) and application programming interface (API) routes (FastAPI, `finance_agents.api.app`) — all routes except /healthz, /metrics, /auth/dev-token need `Authorization: Bearer <jwt>`
+## Hypertext Transfer Protocol (HTTP) and application programming interface (API) routes (FastAPI, `finance_agents.api.app`) — all routes except /healthz, /metrics, /config, /auth/dev-token need `Authorization: Bearer <jwt>`
 - `GET /healthz` → `{ok, db, redis}`; HTTP 503 when `ok` is false (Postgres or Redis down)
 - `GET /metrics` Prometheus
-- `POST /auth/dev-token {user: "alice"|"bob"|"carol"}` → `{token}` ONLY when HR_JWT_MODE=local; 404 otherwise
+- `GET /config` → which models and auth mode this deployment runs (shape in "Demo-hardening decisions" below)
+- `POST /auth/dev-token {user: "alice"|"bob"|"carol"}` → `{token}` ONLY when HR_JWT_MODE=local; 404 otherwise; 400 for an unknown dev user
 - `GET /me` → Principal
-- `POST /chat {question, thread_id?}` → server-sent events (SSE) stream of `TurnEvent` (`event: <type>`, `data: <json>`); last event `answer` or `hitl` or `error`
-- `POST /chat/{thread_id}/approve {approved: bool, note?}` → SSE stream (resumes)
-- `GET /threads/{thread_id}/replay` → replay list
+- `POST /chat {question, thread_id?}` → server-sent events (SSE) stream of `TurnEvent` (`event: <type>`, `data: <json>`); first event `guardrail`, last event `answer` or `hitl` or `error`. 403 when `thread_id` belongs to another principal; 422 `{"detail": {"reasons": [...]}}` when the input guardrail refuses the question (`too_long`, `control_characters`, `empty_after_redaction`, `bedrock_guardrail`; the last adds `message`), and FastAPI's own 422 for a malformed body; 429 with `Retry-After` past the rate limit
+- `POST /chat/{thread_id}/approve {approved: bool, note?}` → SSE stream (resumes); 403 on another principal's thread, 429 past the rate limit
+- `GET /threads/{thread_id}/replay` → replay list; 403 on another principal's thread
 - `GET /documents?limit=` → documents the caller may read (id, title, uri, version, metadata)
 
 ## TurnEvent.data by type
-- status: `{node, message}` · policy: `PolicyDecision` · retrieval: `{candidate_count, chunks:[{document_id, title, section, score}]}`
-- tool: `{tool, ok, latency_ms, from_cache, error?}` (`error` may be `forbidden`, `approval_required`, `denied`, `circuit_open`, `in_progress`) · token: `{text}` · hitl: `{tool, arguments, reason}`
-- answer: `Answer` · error: `{code, message}`
+- status: `{node, agent, kind, message}` (see "The agent team") · policy: `PolicyDecision` · retrieval: `{candidate_count, chunks:[{document_id, title, section, score}]}`
+- tool: `{tool, ok, latency_ms, from_cache, error?}` (`error` may be `forbidden`, `approval_required`, `denied`, `circuit_open`, `in_progress`, or `<ExceptionType>: <message>` when the tool itself failed) · token: `{text}` · hitl: `{tool, arguments, reason}`
+- answer: `Answer` · error: `{code, message}`; `code` is `budget_exceeded`, `nothing_pending`, or the exception's type name (for example `ModelCallFailed` when a Bedrock call fails)
 - guardrail: `{stage: "input", injection_suspected, redactions:[kind]}` (first event of a `/chat` stream) · `{stage: "output", redactions:[kind], uncited}` (just before `answer`)
 
 ## JSON Web Token (JWT) → Principal (`harness.identity`)
@@ -35,7 +37,7 @@ org `acme` id `00000000-0000-0000-0000-000000000001`; alice (finance, analysts; 
 Ingestion access control list (ACL) mapping: Form 10-K (annual report) and Form 10-Q (quarterly report) → groups `finance`,`analysts`; Form 8-K (current report) → `engineering`,`finance`,`analysts`. So bob can read 8-Ks only.
 
 ## Ports
-API `8000`, web `3000`, Postgres `5432`, Valkey `6379`, Temporal `7233` (user interface (UI) `8233`), Phoenix `6006`, OpenTelemetry (OTel) collector `4318`.
+API `8000` (`API_PORT` moves it on the host), web `3000` (`WEB_PORT`), Postgres `5432`, Valkey `6379`, Temporal `7233` (user interface (UI) `8233`), Phoenix `6006`, OpenTelemetry (OTel) collector `4318`.
 
 ## Ingestion durability decision
 Temporal owns ingestion durability (retries, backoff, dead-letter via `ingest_jobs.status='dead'`). There is NO Simple Queue Service (SQS) in the ingestion path and no queue settings. Architecture decision record (ADR) 0003 records when SQS alone would win.
@@ -47,22 +49,24 @@ Cognito: authorization code + Proof Key for Code Exchange (PKCE) in the browser 
 One LangGraph graph is the **Supervisor**: deterministic routing between specialized agents, checkpointed, replayable.
 | Agent | Kind | Owns | Model role |
 |---|---|---|---|
-| Guard | deterministic | identity → Principal, Cedar `answer` decision, fail closed | none |
-| Planner | model (non-deterministic) | understands the question, chooses tools from `registry.specs_for(principal)` via Bedrock Converse tool use | `understand`, `plan` |
-| Researcher | deterministic | runs the planned calls through `harness.runner.run_tool`, assembles evidence (facts first, then chunks), relevance floor | none |
-| Approver | human | approves or denies write/money tools through the interrupt | none |
+| Guard | deterministic | Cedar `answer` decision on the Principal the API already verified, fail closed | none |
+| Planner | model (non-deterministic) | understands the question, chooses tools from `registry.specs_for(principal)` via Bedrock Converse tool use | `understand` (the verifier model on Bedrock); the plan call has no role of its own and runs on the `generate` model |
+| Researcher | deterministic | runs the planned calls through `harness.runner.run_tool`, assembles evidence (facts first, then chunks; the relevance floor is applied in retrieval) | none |
+| Approver | human | approves or denies write tools through the interrupt (the `money` risk level is reserved; no tool uses it) | none |
 | Writer | model (non-deterministic) | grounded draft from the evidence only, cites by index | `generate` |
 | Judge | model (non-deterministic, second cheaper model) | verifies every claim against the evidence; one retry, then abstain | `verify` |
 `status` TurnEvents carry `{node, agent, kind: "deterministic"|"model"|"human", message}`. Node names stay (`understand`, `policy`, `plan`, `act`, `generate`, `verify`, `answer`); `agent` is the team member acting in that node.
 
 ## Guardrails (pinned 2026-11-11)
-`guardrails/` is a belt to the policy layer's braces, never a replacement: `check_input` runs before `graph.stream_turn` (hard failures are 422 `{reasons}`; personally identifiable information (PII) is redacted to `[redacted-<kind>]` in the question the graph sees, a prompt-injection match is tagged, not blocked), `check_output` runs on the final `answer` (text redacted, `uncited` flagged), and `authz.audit._jsonable` redacts every string so no PII lands in `audit_events`. `POST /chat` and `POST /chat/{id}/approve` return 429 with `Retry-After` past `HR_RATE_LIMIT_PER_MINUTE` per principal (Redis key `hr:rl:<org>:<user>:<minute>`; Redis down = allow). Audit kind `guardrail` records one row per turn with the input verdict. When `BEDROCK_GUARDRAIL_ID` is set, every Converse call carries `guardrailConfig` and `ApplyGuardrail` runs on the question and the answer. Table of every guardrail: `docs/GUARDRAILS.md`.
+`guardrails/` is a belt to the policy layer's braces, never a replacement: `check_input` runs before `graph.stream_turn` (hard failures are 422 `{"detail": {"reasons": [...]}}`; personally identifiable information (PII) is redacted to `[redacted-<kind>]` in the question the graph sees, a prompt-injection match is tagged, not blocked), `check_output` runs on the final `answer` (text redacted, `uncited` flagged), and `authz.audit._jsonable` redacts every string so no PII lands in `audit_events`. `POST /chat` and `POST /chat/{id}/approve` return 429 with `Retry-After` past `HR_RATE_LIMIT_PER_MINUTE` per principal (Redis key `hr:rl:<org>:<user>:<minute>`; Redis down = allow). Audit kind `guardrail` records one row per turn with the input verdict. When `BEDROCK_GUARDRAIL_ID` is set, every Converse call carries `guardrailConfig` and `ApplyGuardrail` runs on the question and the answer. Table of every guardrail: `docs/GUARDRAILS.md`.
 
 ## Demo-hardening decisions (pinned 2026-11-11)
 
 **`GET /config`** (no auth) → `{"model_backend": "fake"|"bedrock", "models": {"generate": str, "verify": str, "embed": str, "rerank": str}, "auth_mode": "local"|"cognito"}`. The web app shows it so nobody mistakes the offline stub for a language model.
 
-**`Answer.reason`** (new field, string, always set): `answered` · `no_relevant_evidence` (the reader's permitted documents do not answer it, or the reader has none) · `out_of_scope` · `policy_denied` · `not_grounded` · `action_done` · `action_denied` (the human said no) · `action_forbidden` (the caller's role may not use the tool). `Answer.text` carries a sentence a person can read for each; the web headline is chosen from `reason`.
+**`Answer.reason`** (new field, string, always set): `answered` · `no_relevant_evidence` (the reader's permitted documents do not answer it, or the reader has none) · `out_of_scope` · `policy_denied` · `not_grounded` · `action_done` · `action_denied` (the human said no) · `action_forbidden` (the caller's role may not use the tool) · `action_failed` (approved, then the tool itself failed) · `model_declined` (the model refused, or a content filter or guardrail stopped it) · `approval_pending` (`run_turn` only: the turn is suspended at the approval interrupt). `Answer.trace_id` exists in the type and is never set. `Answer.text` carries a sentence a person can read for each; the web headline is chosen from `reason`.
+
+**`QueryIntent.action`** (new value): a request to do something (a write tool) rather than a question over the filings. A write tool the caller's roles were not offered is still sent to `run_tool`, so the refusal is Cedar's decision with an audit row (`action_forbidden`).
 
 **Numeric questions.** Structured facts are the evidence. When `facts_sql` returns rows for a numeric question the document search is skipped; with no rows the search runs as the fallback. Years named in the question filter the facts by fiscal year. For exactly two periods of one concept the Researcher runs the `calculator` tool and adds the change (absolute and percent) as its own evidence line.
 
@@ -81,4 +85,4 @@ One LangGraph graph is the **Supervisor**: deterministic routing between special
 
 **Personas.** alice: analyst, reads 10-K and 8-K. bob: viewer, reads 8-K only. carol: operations admin, may run write tools after approval, belongs to no reader group and so reads no filings (separation of duties; say so wherever carol is introduced).
 
-**Bedrock models (cloud mode).** Generation and planning `us.anthropic.claude-sonnet-5-5`, verification and classification `us.anthropic.claude-haiku-5-5` (inference profile ids; the bare model ids cannot be invoked on demand). No `temperature`/`top_p`. Thinking is always on, so output caps leave room for it and text is read from `text` blocks only.
+**Bedrock models (cloud mode).** Generation and planning `us.anthropic.claude-sonnet-5-5`, verification and classification `us.anthropic.claude-haiku-5-5` (inference profile ids; the bare model ids cannot be invoked on demand). No `temperature`/`top_p`. Thinking is always on, so output caps leave room for it and text is read from `text` blocks only. Not run live: this mode, Bedrock Guardrails, Cognito sign-in, the Temporal worker path and the Terraform are validated or unit-tested with stubs only.

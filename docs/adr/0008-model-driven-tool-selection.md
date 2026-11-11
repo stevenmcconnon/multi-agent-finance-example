@@ -14,7 +14,7 @@ A `plan` node asks the model for tool calls through Bedrock Converse native tool
 `toolConfig` in, `toolUse` blocks out). The tools it is offered are `registry.specs_for(principal)`, so it only
 sees what the caller's roles may use, and the number of calls is capped by the turn's tool-call budget. The
 `act` node runs every chosen call through `harness/runner.py::run_tool`: Cedar, the risk gate, idempotency,
-timeout, retries, breaker, audit. A write or money call stops at `interrupt()` inside `act` until a human
+timeout, retries, breaker, audit. A write call stops at `interrupt()` inside `act` until a human
 approves. A tool name the model invents is dropped by the gateway, and one it forces is refused by Cedar. A
 lookup the model planned nothing for still gets one `search_documents`, so a question is never answered
 without a retrieval attempt.
@@ -24,7 +24,7 @@ cannot reach.
 
 In production: Claude picks tools via Converse over `specs_for(principal)`.
 In this demo: `FakeGateway.plan` runs `plan_heuristic` (facts for numeric questions, a regex for the one write
-tool, else search), because the fake model is offline and tests must be deterministic; Bedrock also falls back
+tool, else search), because the offline stub is not a model and tests must be deterministic; Bedrock also falls back
 to it when the planner call fails.
 
 ## Alternatives

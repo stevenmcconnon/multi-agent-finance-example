@@ -16,7 +16,10 @@ groups, demo users, Proof Key for Code Exchange (PKCE) client), `policy` (Verifi
 denied investment-advice topic), `compute` (Amazon Elastic Container Service (ECS) cluster, Application Load Balancer (ALB), task definitions and services for `api`, `ingest-worker`,
 `temporal`, `phoenix`, autoscaling on processor load, an Amazon Web Services (AWS) Distro for OpenTelemetry (ADOT) sidecar), `web` (S3 bucket behind CloudFront for the
 single-page application (SPA)), `observability` (ADOT log group, optional Managed Grafana), `schedule` (EventBridge Scheduler
-running the ingest command-line interface (CLI) as an ECS task). `envs/dev` wires them. `infra/otel` holds the collector config.
+running the ingest command-line interface (CLI) as an ECS task, daily, for the newest filing per form per ticker). `envs/dev` wires them. `infra/otel` holds the collector config.
+The Terraform passes `fmt` and `validate` in continuous integration (CI) and has not been applied; the Bedrock, Bedrock Guardrails, Cognito and Temporal-worker
+paths are unit-tested with stubbed clients and have not been run live. Locally, `docker-compose.yml` pins every image version and publishes the
+[ports in CONTRACTS.md](CONTRACTS.md#ports); `WEB_PORT` and `API_PORT` move the web app and the API on the host.
 
     In production: private subnets, network address translation (NAT) or egress-only endpoints, remote Terraform state with locking.
     In this demo: public subnets without NAT and local state, because a clone must `init` with no
@@ -25,35 +28,43 @@ running the ingest command-line interface (CLI) as an ECS task). `envs/dev` wire
 ### L2 Data / Pipelines (`ingest/`)
 
 `edgar.py` (fair-access client, 10 requests/second, `User-Agent` from `EDGAR_USER_AGENT`) ->
-`parse.py` (HyperText Markup Language (HTML) to sections to ~700-word chunks with 80-word sentence-aligned overlap) ->
+`parse.py` (HyperText Markup Language (HTML) to sections named from the U.S. Securities and Exchange Commission (SEC) item headings, "Cover page" then for example "Item 1A. Risk Factors", to ~700-word chunks with 80-word sentence-aligned overlap) ->
 `facts.py` (eXtensible Business Reporting Language (XBRL) `companyfacts` filtered to the filing's accession) -> `writer.py` (documents,
 `document_acl`, chunks with embeddings, facts, in one transaction; unchanged content hash writes nothing).
 `acl.py` maps a form to reader groups. `jobs.py` tracks each `(org, source, source_id, version)` in
 `ingest_jobs` with a sha256 idempotency key; the fifth failure sets `status='dead'`. `workflow.py` makes it
 durable on Temporal: `DiscoverWorkflow` starts one `IngestFilingWorkflow` per filing whose workflow id *is*
 the idempotency key, so a second start of the same version is refused by Temporal itself. There is no Simple Queue Service (SQS)
-and no queue module (architecture decision record [ADR 0003](adr/0003-temporal-owns-ingestion-durability.md)). U.S. Securities and Exchange Commission (SEC) Electronic Data Gathering, Analysis, and Retrieval system (EDGAR) primary documents are
+and no queue module (architecture decision record [ADR 0003](adr/0003-temporal-owns-ingestion-durability.md)). SEC Electronic Data Gathering, Analysis, and Retrieval system (EDGAR) primary documents are
 HTML, so there is no Portable Document Format (PDF) parser. Discovery logs and skips an unknown ticker so
 one typo does not fail and retry the rest of a batch.
 
     In production: PDF via PyMuPDF or Textract, for sources that ship PDFs.
     In this demo: HTML only, because EDGAR primary documents are HTML.
 
+The CLI (`ingest/cli.py`) has four commands: `demo` (the five pinned filings in `ingest/demo_corpus.py`; `make ingest`, and
+`make ingest-rebuild` to parse and embed them again), `run` (the newest filings per form per ticker; `make ingest-latest`),
+`worker` and `migrate`. `make ingest` ends with `make warm`, one real question that loads the embedding and reranking models.
+
+    In production: every ingest runs as Temporal workflows on a worker fleet, and the corpus is whatever the source holds.
+    In this demo: the quickstart runs the same activities inline in the CLI (`docker compose --profile temporal up -d` adds the
+    worker and `--temporal` uses it) over a pinned corpus, because the example questions must keep working and one laptop needs no fleet.
+
 ### L3 Models (`gateway/`, plus `retrieval/embed.py` and `retrieval/rerank.py`)
 
 The only modules that speak to a model vendor (`tests/test_architecture.py::test_boto3_only_behind_the_doors`
 enforces the list). `ModelGateway.complete(role, ...)` picks a model per `ModelRole`: generate (Claude
-Sonnet 4.5), verify and understand (Claude Haiku 4.5), through `bedrock-runtime converse`. `plan` is a fourth
+Sonnet 5.5, `us.anthropic.claude-sonnet-5-5`), verify and understand (Claude Haiku 5.5, `us.anthropic.claude-haiku-5-5`; both are inference profile ids), through `bedrock-runtime converse`. `plan` is a fourth
 call: Converse with `toolConfig` (native tool use) on the generate model, over the tool specs the harness
-offers; if that call fails, the gateway falls back to the deterministic heuristic. `FakeGateway`
-answers deterministically from the numbered evidence lines in the prompt and plans with `plan_heuristic`; it is what tests and the $0
-quickstart run. Embedders produce 512-dimension vectors on both backends ([ADR 0005](adr/0005-512-dim-embeddings.md));
+offers; if that call fails, the gateway falls back to the deterministic heuristic and says so in the node's status event. `FakeGateway`, the offline stub
+(it reports itself as `offline-stub`), answers deterministically from the numbered evidence lines in the prompt and plans with `plan_heuristic`; it is what tests and the $0
+quickstart run. `make up-bedrock` runs the local stack with the Claude models instead (embeddings and reranking stay local); it calls AWS and costs money per question. Embedders produce 512-dimension vectors on both backends ([ADR 0005](adr/0005-512-dim-embeddings.md));
 rerankers are Cohere Rerank 3.5 or a local Best General Embeddings (BGE) cross-encoder, with `none` as a degraded mode.
 When `BEDROCK_GUARDRAIL_ID` is configured, every Converse call carries `guardrailConfig`; the API also calls
 the same managed guardrail directly on the question and final answer. It is disabled in the offline local
 stack. The deterministic checks that still run locally are owned by L5, below.
 
-### L4 Knowledge / Retrieval (`retrieval/` and `authz/`)
+### L4 Knowledge / Retrieval (`retrieval/`)
 
 `retrieval/sql.py` owns the one access control list (ACL) predicate and the three candidate queries that embed it (dense cosine
 over the Hierarchical Navigable Small World index (HNSW), sparse `websearch_to_tsquery` over the generated `tsvector`, facts by entity and
@@ -66,27 +77,27 @@ numbers so the numeric path never asks a model for a figure; `calculator.py` is 
 abstract-syntax-tree-walked evaluator whose float arithmetic, length limit, and exponent cap make chained
 powers fail immediately instead of pinning the process on a large integer.
 
-`authz/` is the policy half: `cedar_local.py` and `verified_permissions.py` implement `Authorizer.decide`
-over the same `entities.py` mapping, fail closed on any error, and audit every decision. `group_cache.py`
-caches principal resolution in Redis with a time to live (TTL) and resolves from Postgres on a miss or a Redis failure.
-`audit.py` is the single writer of `audit_events`; every string passes through the personal-data redactor
-before it is stored.
-
-### L5 Artificial Intelligence (AI) Harness (`harness/` and `guardrails/`)
+### L5 Artificial Intelligence (AI) Harness (`harness/`, `authz/` and `guardrails/`)
 
 `identity.py` turns a JSON Web Token (JWT) into a `Principal`: signature, `exp` (required) and, for Cognito, issuer, audience
 and `token_use` are verified; the user is `cognito:username` and the org the one `org:<slug>` group (locally
 `sub` and `org`). Groups and roles are then *resolved from the database*; the token's claims are a hint that
 never wins. `check_config()` refuses to boot `HR_MODE=aws` on local JWT settings. `registry.py` lists
-tools with their `ToolSpec` (JavaScript Object Notation (JSON) schema, risk level `read | write | money`, required roles, timeout,
+tools with their `ToolSpec` (JavaScript Object Notation (JSON) schema, risk level `read | write | money` (`money` is reserved; no tool uses it), required roles, timeout,
 idempotency). `runner.run_tool` is the one door for a tool call from the agent or Model Context Protocol (MCP) server: Cedar
-`tool:<name>` on the caller's Org; then the risk gate (a `write` or `money` tool returns `approval_required`
+`tool:<name>` on the caller's Org; then the risk gate (a `write` tool returns `approval_required`
 unless the caller passes `approved=True`, which only the graph does, after a human approved); then an
 idempotency reservation (`INSERT ... ON CONFLICT DO NOTHING RETURNING`; the key is
 `org:tool:<thread>:<tool>:<sha256(args)[:16]>`, the graph supplying the last three parts); then a timeout and
 Tenacity retries on transient errors inside a per-tool pybreaker circuit breaker; then an audit row. MCP therefore
 cannot run a write tool. `budget.py` charges tokens,
 tool calls and wall clock per turn and raises `BudgetExceeded`.
+
+`authz/` is the policy part of the harness (Cedar namespace `FinanceAgents`): `cedar_local.py` and `verified_permissions.py` implement `Authorizer.decide`
+over the same `entities.py` mapping, fail closed on any error, and audit every decision. `group_cache.py`
+caches principal resolution in Redis with a time to live (TTL) and resolves from Postgres on a miss or a Redis failure.
+`audit.py` is the single writer of `audit_events`; every string passes through the personal-data redactor
+before it is stored.
 
 `guardrails/` owns the turn boundary around that harness. `input.py` rejects over-length or
 control-character input, tags prompt-injection patterns without treating them as authorization, and
@@ -97,18 +108,18 @@ before the graph or audit sees them. `output.py` redacts the final answer and fl
 the managed-guardrail adapter used in cloud mode. The complete control/test map and deliberate local
 limitations are in [GUARDRAILS.md](GUARDRAILS.md).
 
-### L6 Orchestration (`agent/graph.py`)
+### L6 Orchestration (`agent/graph.py`, `agent/team.py`)
 
 One LangGraph `StateGraph` per turn is the **Supervisor**: deterministic routing between the agents of the
-team pinned in [CONTRACTS.md](CONTRACTS.md) "The agent team". The node names are unchanged; each node is one
-team member acting, and the `status` event carries `{node, agent, kind}`:
+team pinned in [CONTRACTS.md](CONTRACTS.md) "The agent team". Each node is a thin call into the agent class in
+`team.py` that owns the work, and the `status` event carries `{node, agent, kind, message}`:
 
 | Node | Agent | Kind |
 |---|---|---|
 | `understand` | Planner | model |
 | `policy` | Guard | deterministic |
 | `plan` | Planner | model |
-| `act` | Researcher, and the Approver (human) when `interrupt()` parks a write or money call | deterministic / human |
+| `act` | Researcher, and the Approver (human) when `interrupt()` parks a write call | deterministic / human |
 | `generate` | Writer | model |
 | `verify` | Judge (the second, cheaper model) | model |
 | `answer`, `abstain` | Supervisor | deterministic |
@@ -122,12 +133,16 @@ The turn is `understand -> policy -> plan -> act -> generate -> verify -> answer
 abstain`. `plan` asks the model for tool calls through Bedrock Converse native tool use and shows it only
 `registry.specs_for(principal)`; `act` runs each chosen call through `harness.runner.run_tool` (Cedar,
 idempotency, retries, breaker, audit). The Researcher preserves the required document search and caps
-trailing planned read calls to the remaining tool budget. Before a write or money call runs, `act` parks the
-thread with `interrupt()` inside `act` itself (there is no
+trailing planned read calls to the remaining tool budget. For a numeric question the facts are the evidence:
+`facts_sql` runs first, the document search is skipped when facts come back (it is the fallback when none do),
+and for exactly two periods of one concept the Researcher runs the `calculator` tool and adds the change as its
+own evidence line. A request for a write tool the caller was not offered is still sent to `run_tool`, so the
+refusal is Cedar's audited decision, not a hidden menu. Before a write call on the caller's menu runs,
+`Approver.ask` parks the thread with `interrupt()` inside `act` itself (there is no
 separate `hitl` node) until `approve()` resumes it with a `Command`; the node re-runs with the decision. The model's evidence is built only from what those calls
 returned; with none, the model is not called and the turn abstains. A draft the second model finds
 ungrounded is regenerated once with the unsupported claims named, then abstained; unreadable verifier output
-is a failed verification, never an allow. The checkpointer is
+is a failed verification, never an allow. Every `Answer` carries a `reason` and a sentence a person can read for it. The checkpointer is
 `AsyncPostgresSaver` (tables created on startup) or an injected `MemorySaver`; `replay` lists a thread's
 checkpoints; `_assert_owner` keeps a thread with the principal who started it.
 
@@ -146,7 +161,8 @@ what* or *what runs*.
 
 ### L7 Experience (`apps/web`, `api/`, `mcp_server/`)
 
-`api/app.py` is FastAPI: bearer auth on every route but `/healthz`, `/metrics` and the local-only
+`api/` and `mcp_server/` are the two entry points; both call into L5 (identity, guardrails, `run_tool`) and neither holds a rule of its own.
+`api/app.py` is FastAPI: bearer auth on every route but `/healthz`, `/metrics`, `/config` (which models and auth mode are running, so the web app can say so) and the local-only
 `/auth/dev-token`; `/healthz` answers 503 when Postgres or Redis is down, and at startup `check_config()` and
 (in `aws` mode) the Postgres checkpointer fail fast, while in local mode the process stays up degraded.
 `/chat` and `/chat/{thread_id}/approve` are rate-limited per principal and stream `TurnEvent`s as
@@ -155,7 +171,8 @@ server-sent events (SSE). A chat stream begins with the input `guardrail` event 
 and `/documents` (which reuses the ACL predicate). `apps/web` is a Vite + React + TypeScript SPA with React Router,
 Tailwind and Zod validation of every payload: sign-in, chat with the event timeline and the approval card,
 replay, and the documents page that proves item-level permissions by listing what the signed-in identity may
-read. In local mode a persona switcher in the header and "Re-ask as <persona>" chips run the same question
+read. In local mode a persona switcher in the header (which starts a new thread, because a thread belongs to the
+principal who opened it) and "Re-ask as <persona>" chips run the same question
 as another seeded user in a second column; that is the demo's mechanism for showing permissions.
 
     In production: one person, one Cognito sign-in; no persona switch.
@@ -195,7 +212,7 @@ edit.
 records the guardrail verdict without personal data, and emits the input `guardrail` event. Then the
 `Principal` built from a verified token reaches the graph's `policy` node, which asks Cedar for `answer` on
 the Org; `plan` offered the model only `specs_for(principal)`; `run_tool` asks Cedar for
-`tool:<name>`; a `write` or `money` tool additionally needs the human's approval (the `interrupt()` inside
+`tool:<name>`; a `write` tool additionally needs the human's approval (the `interrupt()` inside
 `act`) and is refused as `approval_required` without it; then the idempotency key is reserved before the
 tool runs, so two concurrent calls with one key run it once.
 
@@ -205,6 +222,6 @@ failures per tool for thirty seconds; the turn budget counts the call.
 
 **After**: the outcome is stored on the reserved key (a failed run of an idempotent tool releases the key; a
 failed non-idempotent run keeps its result so it is never re-run by accident), a `tool.call` audit row records
-tool, arguments, outcome and latency, and the retrieval or answer that follows gets its own row. The
+tool, arguments, outcome and latency, a TOOL span joins the turn's trace, and the retrieval or answer that follows gets its own row. The
 checkpointer wrote the node's state; `replay` can show it. At the API boundary the output guardrail redacts
 the final text, flags uncited prose, emits its event, and leaves `answer` as the final stream event.

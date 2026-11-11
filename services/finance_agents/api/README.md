@@ -1,6 +1,6 @@
 # api/
 
-The HTTP edge between L7 Experience (the web app) and L6 Orchestration (the agent graph).
+An L7 entry point: the HTTP API the web app calls. It calls into L5 (identity, guardrails) and L6 (the agent graph) and holds no rule of its own.
 
 ## Files
 
@@ -9,7 +9,7 @@ The HTTP edge between L7 Experience (the web app) and L6 Orchestration (the agen
 | `app.py` | The FastAPI app: lifespan boot, CORS (Cross-Origin Resource Sharing), bearer-token dependency, and every route. |
 | `__init__.py` | Package marker. |
 
-Routes: `GET /healthz`, `POST /auth/dev-token`, `GET /me`, `POST /chat` (server-sent events, SSE), `POST /chat/{thread_id}/approve`, `GET /threads/{thread_id}/replay`, `GET /documents`.
+Routes: `GET /healthz`, `GET /metrics`, `GET /config`, `POST /auth/dev-token`, `GET /me`, `POST /chat` (server-sent events, SSE), `POST /chat/{thread_id}/approve`, `GET /threads/{thread_id}/replay`, `GET /documents`.
 
 ## How it is used
 
@@ -19,10 +19,11 @@ precedes `answer` for output.
 
 ## Rules that hold here
 
-- Every route except `/healthz` and `/auth/dev-token` needs a bearer token; any identity failure is a 401.
+- Every route except `/healthz`, `/metrics`, `/config` and `/auth/dev-token` needs a bearer token; any identity failure is a 401.
+- `/config` names the model backend and models with no secrets, so the web app can show "Models: offline stub" (`test_config_names_the_offline_stub_without_auth`).
 - `/documents` reuses the retrieval predicate (`sql.SCOPE_PREDICATE`, which includes `ACL_PREDICATE`): `test_documents_route_reuses_the_predicate` in `tests/test_architecture.py`.
-- `/auth/dev-token` answers 404 unless `HR_JWT_MODE=local`.
-- Approving or replaying a thread you do not own is refused: `test_approve_on_a_foreign_thread_is_403` in `tests/test_api.py`.
+- `/auth/dev-token` answers 404 unless `HR_JWT_MODE=local`, and 400 for an unknown dev user.
+- Asking on, approving or replaying a thread you do not own is a 403: `test_approve_on_a_foreign_thread_is_403` in `tests/test_api.py`.
 - With `HR_MODE=aws` and local identity defaults the app refuses to boot (`test_aws_mode_on_local_identity_defaults_refuses_to_boot`). `/healthz` answers 503 when the database is down.
 - Input checks reject malformed text, tag suspected injection, and redact personal data before the graph;
   output checks redact again and flag uncited prose. Both appear as `guardrail` events.

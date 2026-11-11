@@ -1,6 +1,6 @@
 # services/
 
-The Python backend: one package, `finance_agents`, plus the Docker image that runs it. It spans layers L2 to L6 (data, models, retrieval, harness, orchestration) and the API edge for L7.
+The Python backend: one package, `finance_agents`, plus the Docker image that runs it. It spans layers L2 to L6 (data, models, retrieval, harness, orchestration) and the two L7 entry points (the API and the Model Context Protocol (MCP) server).
 
 ## Files
 

@@ -6,7 +6,7 @@ The Cedar policies that decide who may do what. Cedar is Amazon's policy languag
 
 | File | What it owns |
 |---|---|
-| `schema.cedarschema` | Namespace `HarnessRag`: entities `Org`, `User`, `Document`; the actions. |
+| `schema.cedarschema` | Namespace `FinanceAgents`: entities `Org`, `User`, `Document`; the actions. |
 | `documents.cedar` | Rules for reading documents and org-wide retrieval and answering. |
 | `tools.cedar` | Rules for tool calls, and the cross-org `forbid`. |
 
@@ -29,7 +29,7 @@ The Cedar policies that decide who may do what. Cedar is Amazon's policy languag
 
 ## How it is used
 
-`authz/cedar_local.py` loads these files and evaluates them in process; Terraform uploads the same text to Verified Permissions (`infra/terraform/modules/policy`). `authz/entities.py` builds the entities.
+`authz/cedar_local.py` loads these files and evaluates them in process; Terraform uploads the same text to Verified Permissions (`infra/terraform/modules/policy`; validated, not applied). `authz/entities.py` builds the entities.
 
 ## Rules that hold here
 

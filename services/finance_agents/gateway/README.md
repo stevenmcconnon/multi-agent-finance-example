@@ -8,7 +8,7 @@ The L3 Models layer: the only place the answer-writing models are spoken to.
 |---|---|
 | `__init__.py` | `get_gateway()`, chosen by `HR_MODEL_BACKEND` (`fake` or `bedrock`); re-exports `FakeGateway`, `format_evidence`. |
 | `bedrock.py` | `BedrockGateway`: Bedrock Converse `complete`, `understand`, and `plan` using native tool use; attaches the configured Bedrock Guardrail to every call. |
-| `fake.py` | `FakeGateway`: deterministic and offline; builds answers only from the evidence in the prompt. |
+| `fake.py` | `FakeGateway`, the offline stub (it reports itself as `offline-stub`): deterministic; understands and plans with rules and builds answers only from the evidence in the prompt. |
 
 ## How it is used
 
@@ -24,8 +24,8 @@ The L3 Models layer: the only place the answer-writing models are spoken to.
 
 ## Production vs this demo
 
-In production: Bedrock with Claude models per role.
-In this demo: the fake gateway is the default, because tests and the local stack must run offline at no cost.
+In production: Bedrock with a Claude model per role: Claude Sonnet 5.5 (`us.anthropic.claude-sonnet-5-5`) generates and plans, Claude Haiku 5.5 (`us.anthropic.claude-haiku-5-5`) verifies and classifies. Both are inference profile ids.
+In this demo: the offline stub is the default, because tests and the local stack must run offline at no cost. `make up-bedrock` runs the local stack with the Claude models; that mode costs money per question and has not been run live yet (the adapter is tested with a stubbed client).
 
 ## Read next
 

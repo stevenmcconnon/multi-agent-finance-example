@@ -9,7 +9,7 @@ The L5 Harness: who the caller is, which tools exist, and the one guarded door e
 | `identity.py` | JSON Web Token (JWT) to `Principal`. Local mode (HS256) or Cognito mode (JSON Web Key Set, JWKS). Raises `InvalidToken` on any failure. |
 | `devtoken.py` | `mint()` dev tokens for the seeded users alice, bob, carol; backs `POST /auth/dev-token`. |
 | `registry.py` | `ToolRegistry`; `specs_for(principal)` hides tools the caller's roles cannot use. |
-| `runner.py` | `run_tool`: the one door. Cedar check, approval, idempotency, timeout, retry, circuit breaker, audit. |
+| `runner.py` | `run_tool`: the one door. Cedar check, approval, idempotency, timeout, retry, circuit breaker, audit, and one TOOL span in the trace. |
 | `budget.py` | `TurnBudget`: tokens, tool calls and a wall-clock deadline per turn. |
 | `tools/search_documents.py` | Retrieval as a read tool. |
 | `tools/facts_sql.py` | Structured numbers from the fact store (read). |
@@ -28,7 +28,7 @@ The L5 Harness: who the caller is, which tools exist, and the one guarded door e
 - Retries are for transient errors only; the breaker opens after five failures (`test_breaker_opens_after_five_failures`).
 - A tool that exceeds `ToolSpec.timeout_seconds` is cancelled, retried under the transient-error policy, and
   returned as a failed `ToolResult`; it never pins the turn (`test_hung_tool_times_out_is_retried_and_reported`).
-- Token groups are a hint; the database decides roles. `HR_MODE=aws` refuses local JWT mode (`tests/test_identity.py`).
+- Token groups are a hint; the database decides roles. `HR_MODE=aws` refuses local JWT mode (`tests/test_identity.py`). Cognito mode is tested with locally generated keys and has not been run against a live user pool.
 - A hidden tool is UX only; Cedar inside `run_tool` is the enforcement (`test_specs_for_hides_tools_by_role`).
 
 ## Read next

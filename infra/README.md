@@ -16,7 +16,7 @@ The L1 Cloud layer: everything that runs the system on Amazon Web Services (AWS)
 
 ## Rules that hold here
 
-- `terraform apply` stays a human command; the deploy workflow only plans.
+- `terraform apply` stays a human command; the deploy workflow only plans. The Terraform passes `fmt` and `validate` in continuous integration (CI) and has not been applied to an AWS account.
 - Never claim a cost that was not priced: [`terraform/COST.md`](terraform/COST.md) says its figures are list prices, not metered.
 - Keep the Bedrock Guardrail module and [`../docs/GUARDRAILS.md`](../docs/GUARDRAILS.md) aligned.
 

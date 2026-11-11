@@ -1,6 +1,6 @@
-# Ponytail, lazy senior dev mode
+# Engineering standard for this repository
 
-You are a lazy senior developer. The best code is the code never written. You solve the whole problem with the least new code. End your reply with one or two lines: what you skipped or did not check, and any risk the user must know.
+These rules are adapted from Ponytail (https://ponytail.dev, MIT licensed). The principle is the smallest complete change: solve the whole problem with the least new code. They are written for both human contributors and artificial intelligence (AI) coding agents. End a change description or reply with one or two lines: what you skipped or did not check, and any risk the reader must know.
 
 ## Before you write
 
@@ -17,21 +17,19 @@ Take the first option that fully works:
 5. Can it be one line a reader gets at a glance? One line.
 6. Otherwise: the minimum code that works.
 
-- Be lazy about the solution, never about the change itself: finish every part the task needs, including the callers, tests and fixtures your change breaks.
+- Be economical with the solution, never with the change itself: finish every part the task needs, including the callers, tests and fixtures your change breaks.
 - No abstraction, wrapper, type conversion, option, config, boilerplate or "for later" code nobody asked for. Keep values in the form the platform already gives you. Deletion beats addition. Keep the structure the codebase already has: its layers, interfaces and conventions.
 - The shortest working diff wins, once you know everything it must touch. A one-liner that needs decoding is not short.
 - Comment only the why the code cannot show, in one line.
 - Bug fix: before you edit, grep every caller of the function you touch, then fix the root cause once in the shared code.
 - Code you move or merge keeps its error handling and validation.
 - Between options of equal size, take the one that is correct on edge cases.
-- Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none.
+- Minimal code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none.
 - A shortcut with a known limit gets a code comment in this form: `shortcut: <the limit>, <when to upgrade>`.
 
 Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for.
 
-(Yes, this file also applies to agents working on the ponytail repo itself. Especially to them.)
-
-## This repo's one extra rule: demo vs production callouts
+## Demo vs production callouts
 
 multi-agent-finance-example is a demonstration that must read as production-shaped. Every place the demo
 takes a cheaper path than a production deployment would, write the pair in this exact form,
@@ -40,7 +38,12 @@ in code as a comment and in docs as a short block:
     In production: <what a real deployment uses>.
     In this demo: <what we use here>, because <cost / scope / data reason>.
 
-Examples: Cedar evaluated in process vs Amazon Verified Permissions; the fake model gateway
+Examples: Cedar evaluated in process vs Amazon Verified Permissions; the offline stub model gateway
 vs Bedrock; EDGAR public filings with simulated item ACLs vs SharePoint with Graph ACLs;
 Temporal dev server vs Temporal on Fargate. Never claim load, latency or scale figures that
 were not measured in this repo.
+
+## Acronyms
+
+Expand every acronym on first use in each document, for example "access control list (ACL)". A reader
+may open any file first.

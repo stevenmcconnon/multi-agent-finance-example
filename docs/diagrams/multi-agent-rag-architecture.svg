@@ -72,7 +72,7 @@
     <circle cx="108" cy="374" r="20" fill="#ccfbf1" opacity="0.22"/>
     <path d="M99 374l7 7l13-16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
     <text x="142" y="374" font-size="22" font-weight="800" fill="#fff">Guard</text>
-    <text x="94" y="410" font-size="14" fill="#ccfbf1">Identity + Cedar policy</text>
+    <text x="94" y="410" font-size="14" fill="#ccfbf1">Cedar policy decision</text>
     <text x="94" y="435" font-size="14" fill="#ccfbf1">Fail-closed authorization</text>
     <rect x="94" y="449" width="112" height="22" rx="11" fill="#042f2e" opacity="0.55"/>
     <text x="150" y="464" text-anchor="middle" font-size="11" font-weight="700" fill="#ccfbf1">DETERMINISTIC</text>
@@ -143,7 +143,7 @@
 
   <rect x="1034" y="605" width="268" height="96" rx="16" fill="url(#human)"/>
   <text x="1056" y="636" font-size="18" font-weight="800" fill="#fff">Human Approver</text>
-  <text x="1056" y="661" font-size="13" fill="#fffbeb">write + money actions pause</text>
+  <text x="1056" y="661" font-size="13" fill="#fffbeb">write actions pause</text>
   <text x="1056" y="683" font-size="13" fill="#fffbeb">approve or deny before execution</text>
 
   <path d="M707 480 V530 H248 V595" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>

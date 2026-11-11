@@ -32,26 +32,26 @@
 <!-- L5 -->
 <rect x="40" y="300" width="1020" height="92" rx="8" fill="#7c3aed"/>
 <text x="56" y="330" font-size="19" font-weight="700" fill="#ffffff">L5  AI Harness</text>
-<text x="56" y="352" font-size="12" fill="#ffffff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">harness/</text>
-<text x="56" y="376" font-size="12.5" fill="#ffffff">Identity, turn guardrails, the one tool door</text>
+<text x="56" y="352" font-size="12" fill="#ffffff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">harness/ · authz/ · guardrails/</text>
+<text x="56" y="376" font-size="12.5" fill="#ffffff">Identity, policy, guardrails, the one tool door</text>
 <rect x="350" y="310" width="360" height="72" rx="6" fill="#f8fafc"/>
-<text x="362" y="336" font-size="14" fill="#111827">python-jose · input/output checks</text>
-<text x="362" y="360" font-size="14" fill="#111827">Redis rate limit · Tenacity · pybreaker</text>
+<text x="362" y="336" font-size="14" fill="#111827">python-jose · Cedar via cedarpy · Valkey</text>
+<text x="362" y="360" font-size="14" fill="#111827">input/output checks · Tenacity · pybreaker</text>
 <rect x="720" y="310" width="330" height="72" rx="6" fill="#f8fafc"/>
-<text x="732" y="336" font-size="14" fill="#111827">Cognito · Bedrock Guardrails</text>
-<text x="732" y="360" font-size="14" fill="#111827">Redis rate limit · Tenacity · pybreaker</text>
+<text x="732" y="336" font-size="14" fill="#111827">Cognito · Verified Permissions · Valkey</text>
+<text x="732" y="360" font-size="14" fill="#111827">Bedrock Guardrails · Tenacity · pybreaker</text>
 
 <!-- L4 -->
 <rect x="40" y="400" width="1020" height="92" rx="8" fill="#b45309"/>
 <text x="56" y="430" font-size="19" font-weight="700" fill="#ffffff">L4  Knowledge / Retrieval</text>
-<text x="56" y="452" font-size="12" fill="#ffffff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">retrieval/ · authz/</text>
-<text x="56" y="476" font-size="12.5" fill="#ffffff">The ACL predicate, hybrid search, policy</text>
+<text x="56" y="452" font-size="12" fill="#ffffff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">retrieval/</text>
+<text x="56" y="476" font-size="12.5" fill="#ffffff">The ACL predicate, hybrid search, facts</text>
 <rect x="350" y="410" width="360" height="72" rx="6" fill="#f8fafc"/>
 <text x="362" y="436" font-size="14" fill="#111827">Postgres: pgvector + tsvector</text>
-<text x="362" y="460" font-size="14" fill="#111827">Cedar via cedarpy · Valkey</text>
+<text x="362" y="460" font-size="14" fill="#111827">reciprocal rank fusion · XBRL facts</text>
 <rect x="720" y="410" width="330" height="72" rx="6" fill="#f8fafc"/>
 <text x="732" y="436" font-size="14" fill="#111827">RDS Postgres (pgvector)</text>
-<text x="732" y="460" font-size="14" fill="#111827">Verified Permissions · ElastiCache Valkey</text>
+<text x="732" y="460" font-size="14" fill="#111827">reciprocal rank fusion · XBRL facts</text>
 
 <!-- L3 -->
 <rect x="40" y="500" width="1020" height="92" rx="8" fill="#be123c"/>
@@ -59,10 +59,10 @@
 <text x="56" y="552" font-size="12" fill="#ffffff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">gateway/ · retrieval/{embed,rerank}.py</text>
 <text x="56" y="576" font-size="12.5" fill="#ffffff">The only code that talks to a model</text>
 <rect x="350" y="510" width="360" height="72" rx="6" fill="#f8fafc"/>
-<text x="362" y="536" font-size="14" fill="#111827">Fake gateway (deterministic)</text>
+<text x="362" y="536" font-size="14" fill="#111827">Offline stub gateway (deterministic)</text>
 <text x="362" y="560" font-size="14" fill="#111827">fastembed: jina embeddings · BGE reranker</text>
 <rect x="720" y="510" width="330" height="72" rx="6" fill="#f8fafc"/>
-<text x="732" y="536" font-size="14" fill="#111827">Bedrock: Claude Sonnet 4.5 · Haiku 4.5</text>
+<text x="732" y="536" font-size="14" fill="#111827">Bedrock: Claude Sonnet 5.5 · Haiku 5.5</text>
 <text x="732" y="560" font-size="14" fill="#111827">Titan Embeddings v2 · Cohere Rerank 3.5</text>
 
 <!-- L2 -->
@@ -72,7 +72,7 @@
 <text x="56" y="676" font-size="12.5" fill="#ffffff">EDGAR fetch, parse, chunk, embed, write</text>
 <rect x="350" y="610" width="360" height="72" rx="6" fill="#f8fafc"/>
 <text x="362" y="636" font-size="14" fill="#111827">httpx (EDGAR client) · BeautifulSoup + lxml</text>
-<text x="362" y="660" font-size="14" fill="#111827">Temporal worker · data/edgar/ on disk</text>
+<text x="362" y="660" font-size="14" fill="#111827">inline CLI (Temporal worker optional)</text>
 <rect x="720" y="610" width="330" height="72" rx="6" fill="#f8fafc"/>
 <text x="732" y="636" font-size="14" fill="#111827">S3 raw bucket · EventBridge Scheduler</text>
 <text x="732" y="660" font-size="14" fill="#111827">ECS Fargate (ingest-worker)</text>

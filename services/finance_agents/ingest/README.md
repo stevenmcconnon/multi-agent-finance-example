@@ -7,19 +7,20 @@ The L2 Data layer: Securities and Exchange Commission (SEC) EDGAR filings into P
 | File | What it owns |
 |---|---|
 | `edgar.py` | EDGAR HTTP client; descriptive User-Agent, at most 10 requests per second. |
-| `parse.py` | Pure: HTML bytes to sections, then `chunk()` (700 characters, 80 overlap). |
+| `parse.py` | Pure: HTML bytes to sections named from the SEC item headings ("Cover page", then for example "Item 1A. Risk Factors"), then `chunk()` (about 700 words, 80 words of overlap). |
 | `facts.py` | Pure: XBRL `companyfacts` to fact rows for one filing. |
 | `acl.py` | `groups_for(form)`: which groups may read a form (the simulated item ACL). |
 | `writer.py` | `write()`: one filing to `documents` + `document_acl` + `chunks` + `facts` in one transaction. |
 | `jobs.py` | `ingest_jobs` bookkeeping; `MAX_ATTEMPTS = 5`. |
 | `workflow.py` | Temporal activities, `IngestFilingWorkflow`, `DiscoverWorkflow`, and `ingest_inline`. |
 | `worker.py` | Temporal worker on task queue `ingest`. |
-| `cli.py` | `run`, `worker`, `migrate` commands. |
+| `demo_corpus.py` | The pinned demo corpus: five filings (two 10-K, three 8-K) with every field a discovered filing has. |
+| `cli.py` | `demo`, `run`, `worker`, `migrate` commands. |
 | `__main__.py` | Lets `python -m finance_agents.ingest` run the CLI. |
 
 ## How it is used
 
-`make ingest` runs `python -m finance_agents.ingest.cli run --tickers AAPL,MSFT ...`, inline by default or through Temporal. The daily schedule in `infra/terraform/modules/schedule` runs the same CLI.
+`make ingest` runs `python -m finance_agents.ingest.cli demo` (the five pinned filings; it fails unless all five are ready) and then `make warm`, one real question that loads the embedding and reranking models. `make ingest-rebuild` is `demo --rebuild` (parse and embed again); `make ingest-latest` is `run --tickers AAPL,MSFT --forms 10-K,8-K --limit 1` (the newest filing per form per ticker). Both commands run inline when `HR_MODE=local` and take `--temporal` to run as Temporal workflows (start the worker with `docker compose --profile temporal up -d`). The daily schedule in `infra/terraform/modules/schedule` runs the `run` command.
 
 ## Rules that hold here
 
@@ -33,7 +34,7 @@ The L2 Data layer: Securities and Exchange Commission (SEC) EDGAR filings into P
 ## Production vs this demo
 
 In production: Temporal on Fargate or Temporal Cloud; originals go to S3; sources like SharePoint via Microsoft Graph; PDFs via PyMuPDF or Textract.
-In this demo: a Temporal dev server or `--inline` mode, HTML filings only, and ACLs simulated by form type, because EDGAR is public and needs no fleet.
+In this demo: `--inline` mode by default with the Temporal dev server and worker optional, a pinned corpus so the example questions keep working, HTML filings only, and ACLs simulated by form type, because EDGAR is public and needs no fleet. The tests call the activities as plain functions; the Temporal workflows and worker have not been run live.
 
 ## Read next
 

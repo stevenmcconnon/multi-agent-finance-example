@@ -16,7 +16,7 @@ The L1 Cloud layer as code: one `dev` environment built from ten small modules. 
 | `modules/guardrails` | Bedrock Guardrail: content and prompt-attack filters, personal-data anonymization, and the denied investment-advice topic. |
 | `modules/observability` | ADOT sidecar definition: metrics to CloudWatch, traces to Phoenix. |
 | `modules/compute` | ECS cluster, Fargate services (api, temporal, phoenix, ingest-worker), load balancer, Elastic Container Registry (ECR). |
-| `modules/schedule` | EventBridge Scheduler: daily EDGAR refresh using the ingest CLI. |
+| `modules/schedule` | EventBridge Scheduler: daily EDGAR refresh at 06:00 UTC using the ingest CLI (`run`, the newest filing per form per ticker). |
 | `modules/web` | S3 bucket and CloudFront for the web build. |
 
 Each module has `main.tf`, `variables.tf` and `outputs.tf`.
@@ -29,7 +29,7 @@ make tf-plan       # init + plan in envs/dev; needs AWS credentials
 make tf-destroy    # scripts/teardown.sh: empties ECR repos, then terraform destroy
 ```
 
-`apply` is run by hand: `cd envs/dev && terraform apply`. Cost and what the destroy removes: [`COST.md`](COST.md).
+`apply` is run by hand: `cd envs/dev && terraform apply`. It has not been run for this repository: the modules pass `fmt` and `validate` only. Cost and what the destroy removes: [`COST.md`](COST.md).
 
 ## Rules that hold here
 

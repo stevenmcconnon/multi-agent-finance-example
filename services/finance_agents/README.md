@@ -1,6 +1,6 @@
 # finance_agents/
 
-The whole backend package: it answers questions over permissioned documents, and every layer from L2 Data to L6 Orchestration lives in a sub-folder here.
+The whole backend package: it answers questions over permissioned documents, and every layer from L2 Data to L6 Orchestration lives in a sub-folder here, with the two L7 entry points (`api/`, `mcp_server/`) that call into them.
 
 ## Files
 
@@ -16,13 +16,13 @@ The whole backend package: it answers questions over permissioned documents, and
 | [`ingest/`](ingest/README.md) | L2 Data | EDGAR filings into Postgres |
 | [`gateway/`](gateway/README.md) | L3 Models | the only door to model vendors |
 | [`retrieval/`](retrieval/README.md) | L4 Knowledge | permission-filtered hybrid search |
-| [`authz/`](authz/README.md) | L5 Harness (authorization half) | Cedar decisions, groups, audit |
+| [`authz/`](authz/README.md) | L5 Harness | Cedar decisions, groups, audit |
 | [`harness/`](harness/README.md) | L5 Harness | identity, tools, guarded runner |
 | [`guardrails/`](guardrails/README.md) | L5 Harness | input/output checks, redaction, rate limiting, Bedrock Guardrails |
 | [`agent/`](agent/README.md) | L6 Orchestration | the LangGraph turn |
-| [`api/`](api/README.md) | L7 edge | FastAPI routes |
-| [`mcp_server/`](mcp_server/README.md) | L5 entry | tools over the Model Context Protocol (MCP) |
-| [`observability/`](observability/README.md) | L1/L6 | OpenTelemetry (OTel) traces and metrics |
+| [`api/`](api/README.md) | L7 entry | FastAPI routes; calls into L5 and L6 |
+| [`mcp_server/`](mcp_server/README.md) | L7 entry | tools over the Model Context Protocol (MCP); calls into L5 |
+| [`observability/`](observability/README.md) | L1 Platform | OpenTelemetry (OTel) traces and metrics |
 
 ## How it is used
 

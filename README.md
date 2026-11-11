@@ -30,7 +30,7 @@ and the **Judge** verifies the answer before delivery.
   comes from the web application, the agent graph, or a Model Context Protocol client.
 - **LLM safety and guardrails:** deterministic identity, authorization, tool policy, budgets,
   idempotency, and citation checks bound the non-deterministic model steps.
-- **Human-in-the-loop agent workflow:** write and money actions pause for explicit approval and can execute
+- **Human-in-the-loop agent workflow:** write actions pause for explicit approval and can execute
   only once after resumption.
 - **LLMOps and AI observability:** audit events, OpenTelemetry traces, graph checkpoints, adversarial
   evaluations, and citation-quality tests make agent behavior inspectable.
@@ -79,10 +79,10 @@ agent with direct access to data and tools.
 | Role | Type | Responsibility |
 |---|---|---|
 | **Supervisor** | Deterministic | Routes the turn, checkpoints each stage, and chooses answer or abstention |
-| **Guard** | Deterministic | Verifies identity and applies authorization policy |
+| **Guard** | Deterministic | Applies authorization policy to the already-verified identity; fails closed |
 | **Planner** | Model | Interprets the question and selects from the tools the user is allowed to call |
 | **Researcher** | Deterministic | Retrieves authorized passages or structured financial facts |
-| **Approver** | Human | Approves or denies write and money actions |
+| **Approver** | Human | Approves or denies write actions |
 | **Writer** | Model | Drafts an answer using only the retrieved evidence |
 | **Judge** | Model | Checks the draft against that evidence before it is returned |
 
@@ -91,22 +91,24 @@ agent with direct access to data and tools.
 Teal components are deterministic controls, purple components are model-driven agents, and amber marks the
 human approval boundary. LangGraph orchestrates the interactive agent turn. A separate Temporal workflow
 handles document ingestion, where long-running retries and resumable jobs matter more than conversational
-state.
+state. The default quickstart runs the same ingestion steps inline; `docker compose --profile temporal up -d`
+runs them as Temporal workflows.
 
 ## System design at a glance
 
 The system follows one request through seven layers:
 
-1. **Experience:** a React web application, streaming FastAPI interface, and Model Context Protocol server.
-2. **Agent orchestration:** the LangGraph Supervisor coordinates the multi-agent workflow and stores checkpoints.
-3. **AI harness and guardrails:** one guarded agent-tool runner applies policy, approval, timeouts, retries,
-   budgets, and idempotency; turn-boundary checks redact personal data, tag injection patterns, check output,
-   and rate-limit each principal.
-4. **RAG and knowledge:** pgvector semantic search, keyword retrieval, reranking, and structured facts
-   share a database-level permission filter.
-5. **Models:** one LLM gateway selects local deterministic behavior or Amazon Bedrock foundation models.
-6. **Data:** an ingestion workflow parses filings into searchable passages and structured financial facts.
-7. **Platform:** Docker runs the local stack; Terraform describes the Amazon Web Services deployment.
+- **L7 Experience:** a React web application, streaming FastAPI interface, and Model Context Protocol server.
+- **L6 Orchestration:** the LangGraph Supervisor coordinates the multi-agent workflow and stores checkpoints.
+- **L5 AI Harness:** one guarded agent-tool runner applies policy, approval, timeouts, retries,
+  budgets, and idempotency; turn-boundary checks redact personal data, tag injection patterns, check output,
+  and rate-limit each principal.
+- **L4 Knowledge / Retrieval:** pgvector semantic search, keyword retrieval, reranking, and structured facts
+  share a database-level permission filter.
+- **L3 Models:** one LLM gateway selects local deterministic behavior or Amazon Bedrock foundation models.
+- **L2 Data / Pipelines:** an ingestion workflow parses filings into searchable passages and structured
+  financial facts.
+- **L1 Cloud / Platform:** Docker runs the local stack; Terraform describes the Amazon Web Services deployment.
 
 ![The seven system layers and their local and cloud implementations](docs/diagrams/stack.svg)
 
@@ -154,6 +156,7 @@ gateway so the complete control flow can be tested without credentials.
 
 - Docker with Docker Compose
 - an email address for the SEC request header
+- `uv` and `pnpm`, only for `make test` and `make lint`
 
 The SEC’s Electronic Data Gathering, Analysis, and Retrieval system (EDGAR) requires automated clients to
 identify themselves with an application name and contact email.
@@ -169,8 +172,9 @@ make up
 make ingest
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The first start downloads the required container
-images and local embedding and reranking models.
+`make ingest` loads a pinned set of five filings (two annual reports, three current reports) and warms the
+models. Open [http://localhost:3000](http://localhost:3000). The first start downloads the required
+container images; the local embedding and reranking models download on the first ingest.
 
 Useful commands:
 
@@ -182,13 +186,15 @@ make down    # stop the local stack
 ```
 
 The local stack includes the web app, API, Postgres with vector search, Valkey, Temporal, an OpenTelemetry
-collector, and Phoenix tracing. See [services and ports](services/README.md) if a local port is already in
-use.
+collector, and Phoenix tracing. See [the port list](docs/CONTRACTS.md#ports) if a local port is already in
+use; set `WEB_PORT` to move the web app.
 
 ## Production-shaped, with explicit demo shortcuts
 
 This repository implements production boundaries, but it does not claim production scale. Where the demo
-takes a lower-cost path, the tradeoff is stated explicitly.
+takes a lower-cost path, the tradeoff is stated explicitly. The cloud paths (Bedrock models and Guardrails,
+Cognito sign-in, the Temporal worker, and the Terraform) are validated or unit-tested with stubs and have not
+been run live.
 
 > In production: company documents and their real permissions come from a system such as SharePoint.
 >
@@ -203,7 +209,7 @@ takes a lower-cost path, the tradeoff is stated explicitly.
 > In production: Amazon Bedrock language, embedding, and reranking models handle model work.
 >
 > In this demo: deterministic language behavior and local embedding and reranking models are the defaults,
-> because the quickstart must run offline without cloud credentials.
+> because the quickstart must run offline without cloud credentials; `make up-bedrock` uses Claude locally.
 
 > In production: the Terraform-managed Bedrock Guardrail filters every model call and both ends of a turn,
 > alongside load-balancer and web-application-firewall limits.
@@ -223,7 +229,7 @@ More detail on the layer boundaries and interchangeable adapters is in the
 ## Tests and evaluation
 
 ```sh
-uv run pytest tests evals/suites -q
+uv run --extra dev pytest
 ```
 
 The automated checks cover:

@@ -16,7 +16,7 @@ idempotency key, so Temporal itself refuses a duplicate. Activities are plain as
 `RetryPolicy` of five attempts and exponential backoff. The dead letter is a row: `ingest_jobs.status='dead'`
 after the fifth failure (`ingest/jobs.py`), queryable with the rest of the control plane. There is no SQS
 queue and no queue module; the `hr_queue_backend` / `sqs_*` settings named in early drafts were removed.
-The same activities run inline without Temporal (`cli run --inline`) for the local quickstart.
+The same activities run inline without Temporal (`cli demo` and `cli run`, inline by default when `HR_MODE=local`) for the local quickstart.
 
     In production: Temporal on Fargate or Temporal Cloud, workers as an Amazon Elastic Container Service (ECS) service, EventBridge
     Scheduler starting the discover run.

@@ -28,7 +28,7 @@ The authorization half of L5 Harness: Cedar decisions, the Principal-to-entity m
 ## Production vs this demo
 
 In production: Verified Permissions, so policy changes are audited and deployed as data.
-In this demo: Cedar runs in process, because a local compose stack has no AWS.
+In this demo: Cedar runs in process, because a local compose stack has no AWS. The Verified Permissions adapter is tested with a stubbed client and has not been run live.
 
 ## Read next
 
