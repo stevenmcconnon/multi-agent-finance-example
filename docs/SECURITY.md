@@ -2,8 +2,8 @@
 
 The one invariant: **an unauthorized chunk never enters a prompt, a reranker, a log, a cache or an eval
 dataset**, and **no write runs without a verified identity, a policy allow and a human approval**. This page
-names the threats considered and the control for each. The README's "security invariant" table maps every
-control to its test.
+names the threats considered and the control for each. [GUARDRAILS.md](GUARDRAILS.md) maps every control to
+its owner, test, and local/cloud behavior.
 
 ## Trust boundaries
 
@@ -74,7 +74,26 @@ builds evidence only from tool results. Injected text can at most change the *qu
 *authorized* chunks rank first. Tests: `tests/test_retrieval.py::test_acl_predicate_in_dense_and_sparse_and_facts`,
 `tests/test_architecture.py::test_every_chunk_or_fact_query_carries_the_acl_predicate`, the permission-leak suite.
 
-### 5. Tool misuse
+### 5. Personal data and unsafe model content
+
+*A question or answer carries an e-mail address, phone number, Social Security number or payment-card
+number. A caller floods the turn endpoint. A model sees prompt-injection or disallowed content.*
+
+Before the graph runs, `guardrails/input.py::check_input` rejects control characters and over-length input,
+tags recognized prompt-injection patterns, and redacts recognized personal-data shapes. The tag is evidence,
+not authorization: Cedar and the database predicate remain the enforcement. `guardrails/output.py` redacts
+the final answer again and flags prose with no citation. `authz/audit.py::_jsonable` applies the same redactor
+to every string before storage. `/chat` and `/chat/{id}/approve` have a shared per-principal Redis rate
+limit and return 429 with `Retry-After`; Redis failure allows the authenticated request and warns.
+
+In cloud mode, the Terraform-managed Bedrock Guardrail adds content and prompt-attack filters, personal-data
+anonymization and a denied investment-advice topic to every model call and both ends of the turn. It is off
+in the $0 local stack. Pattern and managed-filter limits are documented rather than implied away in
+[GUARDRAILS.md](GUARDRAILS.md). Tests: `tests/test_guardrails.py`,
+`tests/test_api.py::test_email_in_the_question_is_redacted_everywhere`,
+`::test_first_sse_event_tags_an_injection_without_blocking`, `::test_chat_is_429_after_the_limit`.
+
+### 6. Tool misuse
 
 *A viewer calls `facts_sql`; an analyst asks for `create_ticket`; a model loops on tool calls; a vendor
 hangs or flaps; a retried write runs twice; a client calls a tool the user interface (UI) hid.*
@@ -96,7 +115,7 @@ turn. Tests: `tests/test_harness.py` (denied call, cached call, retry, breaker, 
 `tests/test_agent.py::test_planned_tool_outside_the_principals_registry_is_refused_by_cedar`,
 `::test_create_ticket_by_alice_is_forbidden_by_cedar`, `::test_create_ticket_declined_changes_nothing`.
 
-### 6. Cross-tenant access
+### 7. Cross-tenant access
 
 *An analyst in `acme` asks about another organization's document; a token carries another org's slug.*
 
@@ -105,17 +124,18 @@ to be in the same org; `db/policies/tools.cedar` adds `cross_org_forbid` as a se
 Thread ownership (`agent/graph.py::_assert_owner`) checks user *and* org. Tests:
 `tests/test_authz.py::test_cross_org_document_denied_even_when_in_acl`, permission-leak case `alice-other-org`.
 
-### 7. Leakage through observability
+### 8. Leakage through observability
 
 *A span, a log line or an audit row carries chunk text or ids the user could not read.*
 
 The `retrieval` audit row lists the document and chunk ids of what was *returned*, after the predicate; the
-`answer` row lists citations; tool rows record arguments and outcome, not retrieved text. OpenTelemetry spans
-from `observability/otel.py` wrap FastAPI, psycopg and LangGraph nodes and carry no evidence text. The
-permission-leak suite walks every audit row and stream event for a forbidden document id. Known limit:
-the user's own question is logged in the `retrieval` row's `query`, which is the user's input, not a leak.
+`answer` row lists citations; tool rows record arguments and outcome, not retrieved text. Every audit string
+passes through the personal-data redactor. OpenTelemetry spans from `observability/otel.py` wrap FastAPI,
+psycopg and LangGraph nodes and carry no evidence text. The permission-leak suite walks every audit row and
+stream event for a forbidden document id. The retrieval query may be logged only after input redaction;
+the pattern-matching limits in `GUARDRAILS.md` still apply.
 
-### 8. Authorized but irrelevant evidence
+### 9. Authorized but irrelevant evidence
 
 *A reader may read only documents that do not answer the question, and the model stitches a confident answer
 from boilerplate.*
@@ -128,13 +148,18 @@ called and the turn abstains (architecture decision record [ADR 0009](adr/0009-r
 
 `/healthz` returns 503 when Postgres or Redis is down. In `aws` mode the API refuses to start without a
 Postgres checkpointer and without proper identity settings; in local mode it stays up and says what is wrong
-at `/healthz`. Test: `tests/test_api.py::test_healthz_is_503_when_the_db_is_down`.
+at `/healthz`. The per-principal request limiter is shared through Redis and deliberately fails open for an
+already authenticated read API; the health endpoint still reports Redis failure. Tests:
+`tests/test_api.py::test_healthz_is_503_when_the_db_is_down`,
+`tests/test_guardrails.py::test_rate_limit_allows_when_redis_is_down`.
 
 ## What this demo does not do
 
 - No secrets in the repo: the dev JWT secret and database password are compose defaults; on AWS the
   database password lives in Secrets Manager and the task reads it by Amazon Resource Name (ARN).
-- No rate limiting, no web application firewall (WAF), no per-user quota beyond the turn budget. A production Application Load Balancer (ALB) fronts a WAF.
+- The API has a fixed-window per-principal rate limit, but no web application firewall (WAF) or edge-level
+  distributed-denial-of-service policy in this demo. A production Application Load Balancer (ALB) fronts a
+  WAF; the application limit remains a second layer.
 - `/auth/dev-token` exists only when `HR_JWT_MODE=local` and returns 404 otherwise. The UI's persona switcher
   uses it, so it is local only too; in production a user is one Cognito identity.
 - The single-page application (SPA) keeps the token in `localStorage`; a production SPA would prefer a backend for frontend (BFF) with an HttpOnly session

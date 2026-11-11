@@ -6,7 +6,7 @@ The L1 Cloud layer: everything that runs the system on Amazon Web Services (AWS)
 
 | Path | What it owns |
 |---|---|
-| `terraform/` | Terraform modules and the `dev` environment. See its [README](terraform/README.md). |
+| `terraform/` | Terraform modules and the `dev` environment, including the managed Bedrock Guardrail. See its [README](terraform/README.md). |
 | `otel/collector.yaml` | OpenTelemetry collector config for local compose: receives traces, exports to Phoenix. |
 | `grafana/api-dashboard.json` | A Grafana dashboard for the API metrics. |
 
@@ -18,6 +18,7 @@ The L1 Cloud layer: everything that runs the system on Amazon Web Services (AWS)
 
 - `terraform apply` stays a human command; the deploy workflow only plans.
 - Never claim a cost that was not priced: [`terraform/COST.md`](terraform/COST.md) says its figures are list prices, not metered.
+- Keep the Bedrock Guardrail module and [`../docs/GUARDRAILS.md`](../docs/GUARDRAILS.md) aligned.
 
 ## Production vs this demo
 

@@ -7,7 +7,7 @@ The L3 Models layer: the only place the answer-writing models are spoken to.
 | File | What it owns |
 |---|---|
 | `__init__.py` | `get_gateway()`, chosen by `HR_MODEL_BACKEND` (`fake` or `bedrock`); re-exports `FakeGateway`, `format_evidence`. |
-| `bedrock.py` | `BedrockGateway`: Bedrock Converse `complete`, `understand`, and `plan` using native tool use. |
+| `bedrock.py` | `BedrockGateway`: Bedrock Converse `complete`, `understand`, and `plan` using native tool use; attaches the configured Bedrock Guardrail to every call. |
 | `fake.py` | `FakeGateway`: deterministic and offline; builds answers only from the evidence in the prompt. |
 
 ## How it is used
@@ -20,6 +20,7 @@ The L3 Models layer: the only place the answer-writing models are spoken to.
 - The model proposes tool calls; it never runs them. The harness decides.
 - Tool planning is tested offline for both adapters in `tests/test_gateway.py`.
 - The Judge is a second model role, so a draft is checked by a separate call.
+- `guardrailConfig` is present only when `BEDROCK_GUARDRAIL_ID` is configured; the adapter is tested with a stubbed Bedrock client.
 
 ## Production vs this demo
 
@@ -30,3 +31,4 @@ In this demo: the fake gateway is the default, because tests and the local stack
 
 - [`../agent/README.md`](../agent/README.md).
 - [`../../docs/adr/0008-model-driven-tool-selection.md`](../../../docs/adr/0008-model-driven-tool-selection.md).
+- [`../../../docs/GUARDRAILS.md`](../../../docs/GUARDRAILS.md).

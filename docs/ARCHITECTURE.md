@@ -12,7 +12,8 @@ Terraform modules under `infra/terraform/modules`: `network` (Virtual Private Cl
 endpoints for Bedrock, Secrets Manager, Amazon Elastic Container Registry (ECR), CloudWatch Logs, Amazon Simple Storage Service (S3)), `database` (Amazon Relational Database Service (RDS) Postgres 16 with
 pgvector, master password in Secrets Manager), `cache` (ElastiCache Valkey), `identity` (Cognito user pool,
 groups, demo users, Proof Key for Code Exchange (PKCE) client), `policy` (Verified Permissions store, schema and the policies from
-`db/policies`), `compute` (Amazon Elastic Container Service (ECS) cluster, Application Load Balancer (ALB), task definitions and services for `api`, `ingest-worker`,
+`db/policies`), `guardrails` (Bedrock content and prompt-attack filters, personal-data anonymization, and a
+denied investment-advice topic), `compute` (Amazon Elastic Container Service (ECS) cluster, Application Load Balancer (ALB), task definitions and services for `api`, `ingest-worker`,
 `temporal`, `phoenix`, autoscaling on processor load, an Amazon Web Services (AWS) Distro for OpenTelemetry (ADOT) sidecar), `web` (S3 bucket behind CloudFront for the
 single-page application (SPA)), `observability` (ADOT log group, optional Managed Grafana), `schedule` (EventBridge Scheduler
 running the ingest command-line interface (CLI) as an ECS task). `envs/dev` wires them. `infra/otel` holds the collector config.
@@ -32,7 +33,8 @@ running the ingest command-line interface (CLI) as an ECS task). `envs/dev` wire
 durable on Temporal: `DiscoverWorkflow` starts one `IngestFilingWorkflow` per filing whose workflow id *is*
 the idempotency key, so a second start of the same version is refused by Temporal itself. There is no Simple Queue Service (SQS)
 and no queue module (architecture decision record [ADR 0003](adr/0003-temporal-owns-ingestion-durability.md)). U.S. Securities and Exchange Commission (SEC) Electronic Data Gathering, Analysis, and Retrieval system (EDGAR) primary documents are
-HTML, so there is no Portable Document Format (PDF) parser.
+HTML, so there is no Portable Document Format (PDF) parser. Discovery logs and skips an unknown ticker so
+one typo does not fail and retry the rest of a batch.
 
     In production: PDF via PyMuPDF or Textract, for sources that ship PDFs.
     In this demo: HTML only, because EDGAR primary documents are HTML.
@@ -47,6 +49,9 @@ offers; if that call fails, the gateway falls back to the deterministic heuristi
 answers deterministically from the numbered evidence lines in the prompt and plans with `plan_heuristic`; it is what tests and the $0
 quickstart run. Embedders produce 512-dimension vectors on both backends ([ADR 0005](adr/0005-512-dim-embeddings.md));
 rerankers are Cohere Rerank 3.5 or a local Best General Embeddings (BGE) cross-encoder, with `none` as a degraded mode.
+When `BEDROCK_GUARDRAIL_ID` is configured, every Converse call carries `guardrailConfig`; the API also calls
+the same managed guardrail directly on the question and final answer. It is disabled in the offline local
+stack. The deterministic checks that still run locally are owned by L5, below.
 
 ### L4 Knowledge / Retrieval (`retrieval/` and `authz/`)
 
@@ -57,14 +62,17 @@ concept). `hybrid.py` runs dense and sparse with the same parameters, fuses with
 (authorized but irrelevant evidence counts as absent; [ADR 0009](adr/0009-rerank-relevance-floor.md)), and
 writes one `retrieval` audit row. The dense query is pinned to the stored `embedding_model` and runs with
 `hnsw.iterative_scan = relaxed_order`, so a reader permitted few chunks still gets `k` rows past the filter. `facts.py` reads structured
-numbers so the numeric path never asks a model for a figure; `calculator.py` is an abstract-syntax-tree-walked evaluator.
+numbers so the numeric path never asks a model for a figure; `calculator.py` is an
+abstract-syntax-tree-walked evaluator whose float arithmetic, length limit, and exponent cap make chained
+powers fail immediately instead of pinning the process on a large integer.
 
 `authz/` is the policy half: `cedar_local.py` and `verified_permissions.py` implement `Authorizer.decide`
 over the same `entities.py` mapping, fail closed on any error, and audit every decision. `group_cache.py`
 caches principal resolution in Redis with a time to live (TTL) and resolves from Postgres on a miss or a Redis failure.
-`audit.py` is the single writer of `audit_events`.
+`audit.py` is the single writer of `audit_events`; every string passes through the personal-data redactor
+before it is stored.
 
-### L5 Artificial Intelligence (AI) Harness (`harness/`)
+### L5 Artificial Intelligence (AI) Harness (`harness/` and `guardrails/`)
 
 `identity.py` turns a JSON Web Token (JWT) into a `Principal`: signature, `exp` (required) and, for Cognito, issuer, audience
 and `token_use` are verified; the user is `cognito:username` and the org the one `org:<slug>` group (locally
@@ -79,6 +87,15 @@ idempotency reservation (`INSERT ... ON CONFLICT DO NOTHING RETURNING`; the key 
 Tenacity retries on transient errors inside a per-tool pybreaker circuit breaker; then an audit row. MCP therefore
 cannot run a write tool. `budget.py` charges tokens,
 tool calls and wall clock per turn and raises `BudgetExceeded`.
+
+`guardrails/` owns the turn boundary around that harness. `input.py` rejects over-length or
+control-character input, tags prompt-injection patterns without treating them as authorization, and
+redacts e-mail addresses, United States phone numbers, Social Security numbers, and payment-card numbers
+before the graph or audit sees them. `output.py` redacts the final answer and flags uncited prose.
+`ratelimit.py` applies a shared per-principal fixed-window limit through Redis to `/chat` and
+`/chat/{id}/approve`; Redis failure allows the authenticated request and logs a warning. `bedrock.py` is
+the managed-guardrail adapter used in cloud mode. The complete control/test map and deliberate local
+limitations are in [GUARDRAILS.md](GUARDRAILS.md).
 
 ### L6 Orchestration (`agent/graph.py`)
 
@@ -104,10 +121,13 @@ team member acting, and the `status` event carries `{node, agent, kind}`:
 The turn is `understand -> policy -> plan -> act -> generate -> verify -> answer |
 abstain`. `plan` asks the model for tool calls through Bedrock Converse native tool use and shows it only
 `registry.specs_for(principal)`; `act` runs each chosen call through `harness.runner.run_tool` (Cedar,
-idempotency, retries, breaker, audit) and, before a write or money call runs, parks the thread with `interrupt()` inside `act` itself (there is no
+idempotency, retries, breaker, audit). The Researcher preserves the required document search and caps
+trailing planned read calls to the remaining tool budget. Before a write or money call runs, `act` parks the
+thread with `interrupt()` inside `act` itself (there is no
 separate `hitl` node) until `approve()` resumes it with a `Command`; the node re-runs with the decision. The model's evidence is built only from what those calls
 returned; with none, the model is not called and the turn abstains. A draft the second model finds
-ungrounded is regenerated once with the unsupported claims named, then abstained. The checkpointer is
+ungrounded is regenerated once with the unsupported claims named, then abstained; unreadable verifier output
+is a failed verification, never an allow. The checkpointer is
 `AsyncPostgresSaver` (tables created on startup) or an injected `MemorySaver`; `replay` lists a thread's
 checkpoints; `_assert_owner` keeps a thread with the principal who started it.
 
@@ -128,7 +148,10 @@ what* or *what runs*.
 
 `api/app.py` is FastAPI: bearer auth on every route but `/healthz`, `/metrics` and the local-only
 `/auth/dev-token`; `/healthz` answers 503 when Postgres or Redis is down, and at startup `check_config()` and
-(in `aws` mode) the Postgres checkpointer fail fast, while in local mode the process stays up degraded; `/chat` and `/chat/{thread_id}/approve` stream `TurnEvent`s as server-sent events (SSE); `/threads/{id}/replay`
+(in `aws` mode) the Postgres checkpointer fail fast, while in local mode the process stays up degraded.
+`/chat` and `/chat/{thread_id}/approve` are rate-limited per principal and stream `TurnEvent`s as
+server-sent events (SSE). A chat stream begins with the input `guardrail` event and emits the output
+`guardrail` event immediately before `answer`; `/threads/{id}/replay`
 and `/documents` (which reuses the ACL predicate). `apps/web` is a Vite + React + TypeScript SPA with React Router,
 Tailwind and Zod validation of every payload: sign-in, chat with the event timeline and the approval card,
 replay, and the documents page that proves item-level permissions by listing what the signed-in identity may
@@ -164,12 +187,14 @@ edit.
 | Authority | S3 (`S3_RAW_BUCKET`) or `data/edgar/`; EDGAR itself | The original filing bytes; `documents.uri` points back | Re-parse without re-download; the source system stays the truth |
 | Search | Postgres: `chunks` (HNSW on `embedding vector(512)`, Generalized Inverted Index (GIN) on `content_tsv`), `facts`, `documents`, `document_acl` | What retrieval ranks, with the ACL rows it filters on | One predicate in one engine ([ADR 0001](adr/0001-pgvector-over-opensearch.md)) |
 | Control | Postgres: `ingest_jobs`, `idempotency_keys`, `audit_events`, `eval_records`, LangGraph `checkpoints*`; `principals`, `group_members`, `orgs` | Job state, tool idempotency (rows are never expired), the audit trail, eval scores, thread checkpoints, the identity mirror | Transactional with the data it describes |
-| Acceleration | Redis / Valkey | `hr:principal:<org>:<user>` group and role resolution, TTL 300 s | A miss or an outage falls back to Postgres; a hit never grants more than the database would |
+| Acceleration | Redis / Valkey | `hr:principal:<org>:<user>` group and role resolution, TTL 300 s; `hr:rl:<org>:<user>:<minute>` request counters | Group-cache failure falls back to Postgres; rate-limit failure allows the authenticated request and warns |
 
 ## The harness turn: before, during, after
 
-**Before** a tool runs: the `Principal` was built from a verified token; the graph's `policy` node asked
-Cedar for `answer` on the Org; `plan` offered the model only `specs_for(principal)`; `run_tool` asks Cedar for
+**Before** the graph runs: the API applies the per-principal rate limit, checks and redacts the question,
+records the guardrail verdict without personal data, and emits the input `guardrail` event. Then the
+`Principal` built from a verified token reaches the graph's `policy` node, which asks Cedar for `answer` on
+the Org; `plan` offered the model only `specs_for(principal)`; `run_tool` asks Cedar for
 `tool:<name>`; a `write` or `money` tool additionally needs the human's approval (the `interrupt()` inside
 `act`) and is refused as `approval_required` without it; then the idempotency key is reserved before the
 tool runs, so two concurrent calls with one key run it once.
@@ -181,4 +206,5 @@ failures per tool for thirty seconds; the turn budget counts the call.
 **After**: the outcome is stored on the reserved key (a failed run of an idempotent tool releases the key; a
 failed non-idempotent run keeps its result so it is never re-run by accident), a `tool.call` audit row records
 tool, arguments, outcome and latency, and the retrieval or answer that follows gets its own row. The
-checkpointer wrote the node's state; `replay` can show it.
+checkpointer wrote the node's state; `replay` can show it. At the API boundary the output guardrail redacts
+the final text, flags uncited prose, emits its event, and leaves `answer` as the final stream event.

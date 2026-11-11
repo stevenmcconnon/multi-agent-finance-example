@@ -1,6 +1,6 @@
 # infra/terraform/
 
-The L1 Cloud layer as code: one `dev` environment built from nine small modules. Terraform is a tool that creates cloud resources from text files.
+The L1 Cloud layer as code: one `dev` environment built from ten small modules. Terraform is a tool that creates cloud resources from text files.
 
 ## Files
 
@@ -10,9 +10,10 @@ The L1 Cloud layer as code: one `dev` environment built from nine small modules.
 | `envs/dev/` | The one environment: `main.tf` wires modules, plus `variables.tf`, `outputs.tf`, `versions.tf`, `backend.tf`, `.terraform.lock.hcl`. |
 | `modules/network` | Virtual Private Cloud (VPC), two public subnets, security groups. |
 | `modules/database` | RDS Postgres 16 with pgvector; random master password. |
-| `modules/cache` | One-node ElastiCache Valkey (group cache and tool results). |
+| `modules/cache` | One-node ElastiCache Valkey (group cache and per-principal rate-limit counters). |
 | `modules/identity` | Cognito user pool: authorization code with PKCE only; `role:*` and `org:<slug>` groups. |
 | `modules/policy` | Verified Permissions policy store holding the Cedar policies. |
+| `modules/guardrails` | Bedrock Guardrail: content and prompt-attack filters, personal-data anonymization, and the denied investment-advice topic. |
 | `modules/observability` | ADOT sidecar definition: metrics to CloudWatch, traces to Phoenix. |
 | `modules/compute` | ECS cluster, Fargate services (api, temporal, phoenix, ingest-worker), load balancer, Elastic Container Registry (ECR). |
 | `modules/schedule` | EventBridge Scheduler: daily EDGAR refresh using the ingest CLI. |
@@ -34,6 +35,7 @@ make tf-destroy    # scripts/teardown.sh: empties ECR repos, then terraform dest
 
 - `terraform fmt -check -recursive` and `validate` must pass (`make tf-validate`).
 - The policy module uploads the same Cedar text the API evaluates locally.
+- The guardrails module passes its identifier and version into the API task; it is off in the $0 local stack.
 - Identity: no implicit flow, no client secret (ADR 0007).
 
 ## Production vs this demo
@@ -45,3 +47,4 @@ In this demo: local state, public subnets with no NAT, a single-AZ database that
 
 - [`COST.md`](COST.md).
 - [`../../docs/diagrams/aws.svg`](../../docs/diagrams/aws.svg).
+- [`../../docs/GUARDRAILS.md`](../../docs/GUARDRAILS.md).

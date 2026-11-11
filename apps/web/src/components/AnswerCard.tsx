@@ -19,14 +19,14 @@ export default function AnswerCard({ answer }: { answer: Answer }) {
     <div className="space-y-3 rounded border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
       <p className="whitespace-pre-wrap break-words">{answer.text}</p>
       <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-        <span>Confidence</span>
-        <span className="h-2 w-32 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800" role="meter" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <span title="The Judge model's confidence that the answer is supported by the retrieved evidence.">Confidence</span>
+        <span title={`${pct}% grounded confidence`} className="h-2 w-32 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800" role="meter" aria-label="Grounded answer confidence" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
           <span className={`block h-full ${pct >= 70 ? "bg-green-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${pct}%` }} />
         </span>
         <span>{pct}%</span>
       </div>
       {v && (
-        <p className={`text-xs ${v.grounded ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>
+        <p title="Verification compares every draft claim with the authorized evidence before the answer is shown." className={`text-xs ${v.grounded ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>
           Verification: {v.grounded ? "grounded" : "not grounded"} · {v.unsupported_claims.length} unsupported claim
           {v.unsupported_claims.length === 1 ? "" : "s"}
           {v.verifier_model && <span className="text-neutral-500"> · {v.verifier_model}</span>}

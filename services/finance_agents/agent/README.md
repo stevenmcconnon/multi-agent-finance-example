@@ -19,6 +19,10 @@ The L6 Orchestration layer: one question-and-answer turn as a LangGraph state ma
 - Nodes delegate to `team.py`. Status events carry `agent` and `kind` (asserted in `tests/test_agent.py`).
 - The agent never imports `psycopg`: `test_agent_never_imports_psycopg` in `tests/test_architecture.py`.
 - `Guard` and `Researcher` never touch the gateway: `test_deterministic_agents_never_reference_the_gateway`.
+- The Researcher keeps the required document search and caps trailing planned read calls to the remaining
+  tool budget instead of turning an overlong plan into an error.
+- Unreadable verifier output is `grounded=False`; unsupported output never becomes an answer. A token-budget
+  failure ends the stream with `error {code:"budget_exceeded"}` and no `answer`.
 - Write and money tools pause on an `interrupt` until a human approves; the tool still goes through `run_tool`.
 - When the graph changes, update the state diagram in the root README in the same commit (see `docs/diagrams/README.md`).
 
@@ -30,4 +34,4 @@ In this demo: a per-process `MemorySaver` with a warning is the fallback, so the
 ## Read next
 
 - [`../harness/README.md`](../harness/README.md), the tool door the Researcher uses.
-- [`../../docs/TOUR.md`](../../../docs/TOUR.md) stops 7 to 10.
+- [`../../docs/TOUR.md`](../../../docs/TOUR.md) stops 7 to 11.

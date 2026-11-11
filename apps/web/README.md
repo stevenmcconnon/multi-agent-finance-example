@@ -37,4 +37,7 @@ aws cloudfront create-invalidation --distribution-id <id> --paths "/index.html"
 | `VITE_AUTH_MODE` | `local` (alice/bob/carol via `POST /auth/dev-token`) or `cognito` (hosted UI, authorization code + PKCE, callback at `/auth/callback`; never the implicit flow) |
 | `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_REDIRECT_URI` | cognito mode only; redirect URI defaults to `<origin>/auth/callback` |
 
-Pages: `/` sign in · `/auth/callback` PKCE code exchange · `/chat` streamed turn timeline with HITL approve/deny · `/threads/:id` checkpoint replay · `/documents` what the signed-in identity may read.
+Pages: `/` sign in · `/auth/callback` PKCE code exchange · `/chat` streamed, color-coded turn phases with
+guardrail status and human-in-the-loop (HITL) approve/deny · `/threads/:id` checkpoint replay · `/documents`
+what the signed-in identity may read. `src/lib/schemas.ts` mirrors every `TurnEvent`, including the input and
+output `guardrail` events; `src/lib/timeline.ts` maps those events to the reader-facing phase cards.

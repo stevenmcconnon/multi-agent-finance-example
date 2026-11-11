@@ -26,10 +26,12 @@ The L5 Harness: who the caller is, which tools exist, and the one guarded door e
 - The model never calls a provider or a table directly; every effect goes through `run_tool`. Tested in `tests/test_harness.py` (`test_bob_cannot_call_facts_sql`, `test_write_tool_needs_explicit_approval`).
 - Idempotency reserves its key before running, so concurrent calls run the tool once (`test_concurrent_same_key_runs_the_tool_once`).
 - Retries are for transient errors only; the breaker opens after five failures (`test_breaker_opens_after_five_failures`).
+- A tool that exceeds `ToolSpec.timeout_seconds` is cancelled, retried under the transient-error policy, and
+  returned as a failed `ToolResult`; it never pins the turn (`test_hung_tool_times_out_is_retried_and_reported`).
 - Token groups are a hint; the database decides roles. `HR_MODE=aws` refuses local JWT mode (`tests/test_identity.py`).
 - A hidden tool is UX only; Cedar inside `run_tool` is the enforcement (`test_specs_for_hides_tools_by_role`).
 
 ## Read next
 
 - [`../authz/README.md`](../authz/README.md), the Cedar decision `run_tool` asks for.
-- [`../../docs/TOUR.md`](../../../docs/TOUR.md) stop 6, the tool door.
+- [`../../docs/TOUR.md`](../../../docs/TOUR.md) stop 7, the tool door.

@@ -26,6 +26,8 @@ The L2 Data layer: Securities and Exchange Commission (SEC) EDGAR filings into P
 - Network calls happen only inside Temporal activities (`discover`, `fetch`); `parse.py` and `facts.py` do no input or output. Workflows hold no input or output. Convention, not tested.
 - The fifth failure marks a job dead: `ingest_jobs.status = 'dead'` is the dead letter. Tested by `test_jobs_go_dead_on_fifth_failure_and_then_skip` in `tests/test_ingest.py`.
 - The idempotency key is a hash of org, source, source id and version (`test_idempotency_key_is_stable_and_version_sensitive`); an unchanged `content_hash` writes nothing.
+- Discovery logs and skips an unknown ticker instead of retrying or failing the rest of the batch
+  (`test_discover_skips_an_unknown_ticker`).
 - This folder may use `boto3` for S3 (the architecture test exempts `ingest/`).
 
 ## Production vs this demo

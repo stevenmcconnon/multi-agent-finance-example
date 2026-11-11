@@ -18,6 +18,7 @@ The whole backend package: it answers questions over permissioned documents, and
 | [`retrieval/`](retrieval/README.md) | L4 Knowledge | permission-filtered hybrid search |
 | [`authz/`](authz/README.md) | L5 Harness (authorization half) | Cedar decisions, groups, audit |
 | [`harness/`](harness/README.md) | L5 Harness | identity, tools, guarded runner |
+| [`guardrails/`](guardrails/README.md) | L5 Harness | input/output checks, redaction, rate limiting, Bedrock Guardrails |
 | [`agent/`](agent/README.md) | L6 Orchestration | the LangGraph turn |
 | [`api/`](api/README.md) | L7 edge | FastAPI routes |
 | [`mcp_server/`](mcp_server/README.md) | L5 entry | tools over the Model Context Protocol (MCP) |
@@ -25,7 +26,10 @@ The whole backend package: it answers questions over permissioned documents, and
 
 ## How it is used
 
-`api/app.py` verifies the token, then calls `agent.graph.stream_turn(principal, question, thread_id)`. Adapters are chosen by config through `get_gateway()`, `get_retriever()` and `get_authorizer()`.
+`api/app.py` verifies the token, applies the input guardrail, and then calls
+`agent.graph.stream_turn(principal, question, thread_id)`. It applies the output guardrail before the final
+answer leaves the API. Adapters are chosen by config through `get_gateway()`, `get_retriever()` and
+`get_authorizer()`.
 
 ## Rules that hold here
 
@@ -35,4 +39,4 @@ The whole backend package: it answers questions over permissioned documents, and
 
 ## Read next
 
-- [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) and [`../../docs/CONTRACTS.md`](../../docs/CONTRACTS.md).
+- [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md), [`../../docs/CONTRACTS.md`](../../docs/CONTRACTS.md), and [`../../docs/GUARDRAILS.md`](../../docs/GUARDRAILS.md).

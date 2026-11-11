@@ -23,6 +23,8 @@ The L4 Knowledge layer: finds chunks and facts the caller may read, ranks them, 
 - Every query over chunks or facts carries `ACL_PREDICATE` before `LIMIT`, so an unauthorized chunk never enters a ranked list. Enforced by `test_every_chunk_or_fact_query_carries_the_acl_predicate` in `tests/test_architecture.py`; the `/documents` route is checked by `test_documents_route_reuses_the_predicate`.
 - Nothing after SQL adds or removes authorization.
 - Numbers are read from `facts` and computed with `calculator.py`, never guessed.
+- Calculator constants become floats before arithmetic; exponent size and expression length are capped, so
+  chained powers overflow immediately instead of constructing a process-blocking big integer.
 - Chunks scoring below the reranker's floor are dropped (ADR 0009); no evidence means the turn abstains.
 - `boto3` is allowed here only in `embed.py` and `rerank.py` (the test's allowlist).
 

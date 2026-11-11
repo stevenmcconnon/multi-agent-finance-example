@@ -122,8 +122,10 @@ export default function ChatPage() {
               )}
             </div>
           )}
-          <p className="rounded bg-neutral-200/60 px-3 py-2 font-medium dark:bg-neutral-800">{t.question}</p>
-          {t.items.length > 0 && <p className="text-xs text-neutral-500">Grey = deterministic step, blue = model call, orange = a human decides</p>}
+          <div className="rounded-xl border border-blue-300 bg-blue-50/70 px-4 py-3 shadow-sm dark:border-blue-800 dark:bg-blue-950/25">
+            <p className="text-[0.68rem] font-bold tracking-[0.18em] text-blue-700 dark:text-blue-300">USER QUESTION</p>
+            <p className="mt-1 font-medium">{t.question}</p>
+          </div>
           <EventTimeline items={t.items} busy={busy && last} onDecide={decide} />
           {done && !busy && (
             <div className="flex flex-wrap gap-2">

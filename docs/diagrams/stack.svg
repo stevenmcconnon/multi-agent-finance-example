@@ -33,13 +33,13 @@
 <rect x="40" y="300" width="1020" height="92" rx="8" fill="#7c3aed"/>
 <text x="56" y="330" font-size="19" font-weight="700" fill="#ffffff">L5  AI Harness</text>
 <text x="56" y="352" font-size="12" fill="#ffffff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">harness/</text>
-<text x="56" y="376" font-size="12.5" fill="#ffffff">Identity, tool registry, the one tool door</text>
+<text x="56" y="376" font-size="12.5" fill="#ffffff">Identity, turn guardrails, the one tool door</text>
 <rect x="350" y="310" width="360" height="72" rx="6" fill="#f8fafc"/>
-<text x="362" y="336" font-size="14" fill="#111827">python-jose (HS256 dev tokens)</text>
-<text x="362" y="360" font-size="14" fill="#111827">Tenacity · pybreaker</text>
+<text x="362" y="336" font-size="14" fill="#111827">python-jose · input/output checks</text>
+<text x="362" y="360" font-size="14" fill="#111827">Redis rate limit · Tenacity · pybreaker</text>
 <rect x="720" y="310" width="330" height="72" rx="6" fill="#f8fafc"/>
-<text x="732" y="336" font-size="14" fill="#111827">Cognito (RS256 JWKS)</text>
-<text x="732" y="360" font-size="14" fill="#111827">Tenacity · pybreaker</text>
+<text x="732" y="336" font-size="14" fill="#111827">Cognito · Bedrock Guardrails</text>
+<text x="732" y="360" font-size="14" fill="#111827">Redis rate limit · Tenacity · pybreaker</text>
 
 <!-- L4 -->
 <rect x="40" y="400" width="1020" height="92" rx="8" fill="#b45309"/>

@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 820" width="1400" height="820" role="img" aria-labelledby="title description" font-family="Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+  <title id="title">Multi-agent RAG architecture</title>
+  <desc id="description">A color-coded architecture showing the Supervisor coordinating Guard, Planner, Researcher, Writer, Judge, and human Approver roles around a permission-aware retrieval layer and guarded tool runner.</desc>
+
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07152f"/>
+      <stop offset="0.55" stop-color="#0b2349"/>
+      <stop offset="1" stop-color="#102f52"/>
+    </linearGradient>
+    <linearGradient id="supervisor" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="model" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="deterministic" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f766e"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+    <linearGradient id="human" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d97706"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#020617" flood-opacity="0.35"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#93c5fd"/>
+    </marker>
+    <marker id="arrowHuman" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="820" rx="28" fill="url(#background)"/>
+  <circle cx="1250" cy="110" r="190" fill="#2563eb" opacity="0.08"/>
+  <circle cx="110" cy="730" r="220" fill="#14b8a6" opacity="0.07"/>
+
+  <text x="70" y="70" font-size="34" font-weight="750" fill="#ffffff">Permission-aware multi-agent RAG architecture</text>
+  <text x="70" y="104" font-size="17" fill="#bfdbfe">Models interpret and communicate. Deterministic controls own identity, access, tools, and evidence.</text>
+
+  <!-- User request and response -->
+  <rect x="70" y="162" width="200" height="82" rx="18" fill="#f8fafc" filter="url(#shadow)"/>
+  <circle cx="106" cy="203" r="20" fill="#2563eb"/>
+  <path d="M99 200a7 7 0 1 1 14 0a7 7 0 0 1-14 0m-5 17c2-7 8-10 12-10s10 3 12 10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <text x="140" y="198" font-size="18" font-weight="700" fill="#0f172a">User question</text>
+  <text x="140" y="220" font-size="13" fill="#475569">finance or risk query</text>
+
+  <rect x="1130" y="162" width="200" height="82" rx="18" fill="#f8fafc" filter="url(#shadow)"/>
+  <circle cx="1166" cy="203" r="20" fill="#16a34a"/>
+  <path d="M1156 203l7 7l13-16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="1200" y="198" font-size="18" font-weight="700" fill="#0f172a">Cited answer</text>
+  <text x="1200" y="220" font-size="13" fill="#475569">or safe abstention</text>
+
+  <!-- Supervisor -->
+  <rect x="490" y="135" width="420" height="124" rx="24" fill="url(#supervisor)" filter="url(#shadow)"/>
+  <text x="700" y="178" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="1.8" fill="#dbeafe">LANGGRAPH ORCHESTRATION</text>
+  <text x="700" y="214" text-anchor="middle" font-size="30" font-weight="800" fill="#ffffff">Supervisor</text>
+  <text x="700" y="240" text-anchor="middle" font-size="15" fill="#e0e7ff">routes state · checkpoints every stage · answer or abstain</text>
+
+  <path d="M270 203 H480" stroke="#93c5fd" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+  <path d="M920 203 H1120" stroke="#93c5fd" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Agent row -->
+  <text x="70" y="309" font-size="14" font-weight="700" letter-spacing="1.6" fill="#94a3b8">SPECIALIZED AGENTS</text>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="335" width="235" height="145" rx="20" fill="url(#deterministic)"/>
+    <circle cx="108" cy="374" r="20" fill="#ccfbf1" opacity="0.22"/>
+    <path d="M99 374l7 7l13-16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="142" y="374" font-size="22" font-weight="800" fill="#fff">Guard</text>
+    <text x="94" y="410" font-size="14" fill="#ccfbf1">Identity + Cedar policy</text>
+    <text x="94" y="435" font-size="14" fill="#ccfbf1">Fail-closed authorization</text>
+    <rect x="94" y="449" width="112" height="22" rx="11" fill="#042f2e" opacity="0.55"/>
+    <text x="150" y="464" text-anchor="middle" font-size="11" font-weight="700" fill="#ccfbf1">DETERMINISTIC</text>
+
+    <rect x="330" y="335" width="235" height="145" rx="20" fill="url(#model)"/>
+    <circle cx="368" cy="374" r="20" fill="#f3e8ff" opacity="0.22"/>
+    <path d="M359 368h18M359 374h13M359 380h16" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    <text x="402" y="374" font-size="22" font-weight="800" fill="#fff">Planner</text>
+    <text x="354" y="410" font-size="14" fill="#f3e8ff">Understands intent</text>
+    <text x="354" y="435" font-size="14" fill="#f3e8ff">Selects allowed tools</text>
+    <rect x="354" y="449" width="74" height="22" rx="11" fill="#3b0764" opacity="0.55"/>
+    <text x="391" y="464" text-anchor="middle" font-size="11" font-weight="700" fill="#f3e8ff">MODEL</text>
+
+    <rect x="590" y="335" width="235" height="145" rx="20" fill="url(#deterministic)"/>
+    <circle cx="628" cy="374" r="20" fill="#ccfbf1" opacity="0.22"/>
+    <path d="M619 365h18v18h-18zM623 361v8M633 361v8" fill="none" stroke="#fff" stroke-width="2.5"/>
+    <text x="662" y="374" font-size="22" font-weight="800" fill="#fff">Researcher</text>
+    <text x="614" y="410" font-size="14" fill="#ccfbf1">Hybrid retrieval + facts</text>
+    <text x="614" y="435" font-size="14" fill="#ccfbf1">Authorized evidence only</text>
+    <rect x="614" y="449" width="112" height="22" rx="11" fill="#042f2e" opacity="0.55"/>
+    <text x="670" y="464" text-anchor="middle" font-size="11" font-weight="700" fill="#ccfbf1">DETERMINISTIC</text>
+
+    <rect x="850" y="335" width="235" height="145" rx="20" fill="url(#model)"/>
+    <circle cx="888" cy="374" r="20" fill="#f3e8ff" opacity="0.22"/>
+    <path d="M879 381l3-12l12-3l-3 12z" fill="none" stroke="#fff" stroke-width="2.5"/>
+    <text x="922" y="374" font-size="22" font-weight="800" fill="#fff">Writer</text>
+    <text x="874" y="410" font-size="14" fill="#f3e8ff">Evidence-grounded draft</text>
+    <text x="874" y="435" font-size="14" fill="#f3e8ff">Inline source citations</text>
+    <rect x="874" y="449" width="74" height="22" rx="11" fill="#3b0764" opacity="0.55"/>
+    <text x="911" y="464" text-anchor="middle" font-size="11" font-weight="700" fill="#f3e8ff">MODEL</text>
+
+    <rect x="1110" y="335" width="220" height="145" rx="20" fill="url(#model)"/>
+    <circle cx="1148" cy="374" r="20" fill="#f3e8ff" opacity="0.22"/>
+    <path d="M1139 374l6 6l12-14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1182" y="374" font-size="22" font-weight="800" fill="#fff">Judge</text>
+    <text x="1134" y="410" font-size="14" fill="#f3e8ff">Checks every claim</text>
+    <text x="1134" y="435" font-size="14" fill="#f3e8ff">Retry once or abstain</text>
+    <rect x="1134" y="449" width="74" height="22" rx="11" fill="#3b0764" opacity="0.55"/>
+    <text x="1171" y="464" text-anchor="middle" font-size="11" font-weight="700" fill="#f3e8ff">MODEL</text>
+  </g>
+
+  <!-- Main sequence -->
+  <path d="M188 325 C188 285 510 290 585 253" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M700 269 V318" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M305 407 H320" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M565 407 H580" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M825 407 H840" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M1085 407 H1100" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Control plane -->
+  <rect x="70" y="545" width="1260" height="188" rx="24" fill="#f8fafc" filter="url(#shadow)"/>
+  <text x="98" y="581" font-size="14" font-weight="800" letter-spacing="1.5" fill="#64748b">DETERMINISTIC CONTROL + KNOWLEDGE PLANE</text>
+
+  <rect x="98" y="605" width="300" height="96" rx="16" fill="#e0f2fe" stroke="#38bdf8" stroke-width="2"/>
+  <text x="120" y="636" font-size="18" font-weight="800" fill="#075985">Permission-aware RAG</text>
+  <text x="120" y="661" font-size="13" fill="#0c4a6e">pgvector + keyword search + rerank</text>
+  <text x="120" y="683" font-size="13" fill="#0c4a6e">ACL filter runs before model context</text>
+
+  <rect x="420" y="605" width="300" height="96" rx="16" fill="#dcfce7" stroke="#22c55e" stroke-width="2"/>
+  <text x="442" y="636" font-size="18" font-weight="800" fill="#166534">Guardrails + tool runner</text>
+  <text x="442" y="661" font-size="13" fill="#14532d">input/output · policy · budgets · retries</text>
+  <text x="442" y="683" font-size="13" fill="#14532d">rate limit · audit · exactly-once writes</text>
+
+  <rect x="742" y="605" width="270" height="96" rx="16" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2"/>
+  <text x="764" y="636" font-size="18" font-weight="800" fill="#5b21b6">Model gateway</text>
+  <text x="764" y="661" font-size="13" fill="#4c1d95">local deterministic or Bedrock</text>
+  <text x="764" y="683" font-size="13" fill="#4c1d95">LLM · embeddings · reranker</text>
+
+  <rect x="1034" y="605" width="268" height="96" rx="16" fill="url(#human)"/>
+  <text x="1056" y="636" font-size="18" font-weight="800" fill="#fff">Human Approver</text>
+  <text x="1056" y="661" font-size="13" fill="#fffbeb">write + money actions pause</text>
+  <text x="1056" y="683" font-size="13" fill="#fffbeb">approve or deny before execution</text>
+
+  <path d="M707 480 V530 H248 V595" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M707 480 V530 H570 V595" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M968 480 V595" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M720 653 H732" stroke="#93c5fd" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M570 605 V590 H1168 V605" stroke="#fbbf24" stroke-width="3" stroke-dasharray="8 6" fill="none" marker-end="url(#arrowHuman)"/>
+
+  <!-- Footer legend -->
+  <circle cx="98" cy="779" r="8" fill="#14b8a6"/>
+  <text x="114" y="785" font-size="13" fill="#cbd5e1">deterministic control</text>
+  <circle cx="278" cy="779" r="8" fill="#a855f7"/>
+  <text x="294" y="785" font-size="13" fill="#cbd5e1">model reasoning</text>
+  <circle cx="438" cy="779" r="8" fill="#f59e0b"/>
+  <text x="454" y="785" font-size="13" fill="#cbd5e1">human decision</text>
+  <text x="1330" y="785" text-anchor="end" font-size="13" fill="#94a3b8">LangGraph · Cedar · pgvector · Bedrock · OpenTelemetry</text>
+</svg>

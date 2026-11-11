@@ -6,7 +6,7 @@ The L7 Experience layer: user-facing clients. There is one, the web app.
 
 | Path | What it owns |
 |---|---|
-| `web/` | React + Vite single-page app: sign-in, chat, documents, replay, approvals. See [`web/README.md`](web/README.md). |
+| `web/` | React + Vite single-page app: sign-in, explanatory agent trace, guardrail status, documents, replay, approvals. See [`web/README.md`](web/README.md). |
 
 ## How it is used
 

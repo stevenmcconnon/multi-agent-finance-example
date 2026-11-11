@@ -18,7 +18,22 @@ token's own `groups` claim is never copied into the `Principal`. A failed resolu
 What to notice: `contracts.py` `Principal` has the docstring "Built ONLY from a verified JWT by
 harness.identity". Nothing else constructs one in production code.
 
-## 2. Principal -> Cedar
+## 2. Input guardrail
+
+`api/app.py` `chat` applies the per-principal Redis rate limit, then calls
+`guardrails/input.py` `check_input` before the graph sees the question. Over-length text, control characters,
+or a question that becomes empty after redaction returns 422. Recognized e-mail, United States phone,
+Social Security and payment-card shapes become `[redacted-<kind>]`; recognized prompt-injection phrases are
+tagged, not treated as authorization. The redacted verdict is audited and the first server-sent event is
+`guardrail {stage:"input", injection_suspected, redactions}`. When configured in cloud mode,
+`BedrockGuardrail.apply(..., "INPUT")` adds the managed content, prompt-attack, personal-data and denied-topic
+checks. The local stack keeps only the deterministic checks and Redis counter.
+
+What to notice: input guardrails reduce unsafe or sensitive content, but they do not decide access. The
+verified Principal, Cedar and the database predicate still own authorization. Full map:
+[GUARDRAILS.md](GUARDRAILS.md).
+
+## 3. Principal -> Cedar
 
 Two places ask Cedar, both through the `Authorizer` port (`interfaces.py`):
 
@@ -37,7 +52,7 @@ What to notice: the per-document `document_acl_read` policy exists and is tested
 call Cedar once per chunk. Row-level filtering is the Structured Query Language (SQL) predicate in the next stop; Cedar decides the
 coarse question and the tools.
 
-## 3. The SQL predicate
+## 4. The SQL predicate
 
 `services/finance_agents/retrieval/sql.py` `ACL_PREDICATE`: an `EXISTS` over `document_acl` joined to
 `principals`, matching the caller's user id or any of the caller's group names, in the caller's org.
@@ -49,7 +64,7 @@ only source of the parameters.
 constant over `chunks` or `facts` and asserts the predicate is present and precedes `LIMIT`. Add a fourth
 query without it and the build fails.
 
-## 4. Hybrid retrieval and reciprocal rank fusion (RRF)
+## 5. Hybrid retrieval and reciprocal rank fusion (RRF)
 
 `retrieval/hybrid.py` `PgHybridRetriever.retrieve`: embed the rewritten query (`Embedder.embed`), run
 `DENSE_SQL` (cosine over the Hierarchical Navigable Small World index (HNSW), pinned to the stored `embedding_model`, with
@@ -61,7 +76,7 @@ set from data.
 `tests/test_retrieval.py` `test_rrf_ordering_fixed_input` pins the fusion arithmetic; `test_retriever_fuses_and_audits`
 injects a fetch that asserts the predicate and the principal's groups on each call.
 
-## 5. Rerank
+## 6. Rerank
 
 Still in `retrieve`: `Reranker.rerank(query.original, candidates, rerank_top_n)`. `retrieval/rerank.py`
 offers `BAAI/bge-reranker-base` locally, Cohere Rerank 3.5 through `bedrock-runtime invoke_model`, or
@@ -73,13 +88,13 @@ receives candidates that passed the predicate and nothing else. Then the relevan
 `retrieve` ends with `audit.record("retrieval", ...)`: query, counts, and the document and chunk ids of what
 was returned.
 
-## 6. The tool door
+## 7. The tool door
 
 `harness/tools/search_documents.py` `SearchDocumentsTool.run` wraps the retriever; it returns
 `retrieval_not_acl_filtered` if a retriever ever came back unmarked. In the graph, `plan` asks the model to
 choose tools from `registry.specs_for(principal)` (`gateway.plan`, Bedrock Converse native tool use; the fake
 gateway's `plan_heuristic` is deterministic) and `act` runs each choice. `harness/runner.py` `run_tool` is
-what `act` calls: Cedar (stop 2); the risk gate (a write or money tool returns `approval_required` unless
+what `act` calls: Cedar (stop 3); the risk gate (a write or money tool returns `approval_required` unless
 `approved=True`); the idempotency reservation (`INSERT ... ON CONFLICT DO NOTHING RETURNING`); then the call
 inside `asyncio.timeout`, Tenacity (three attempts on `TransientError`, `TimeoutError`, `ConnectionError`) and a
 per-tool pybreaker; then `audit.record("tool.call", ...)`. `harness/budget.py` `TurnBudget.charge` is called
@@ -88,7 +103,7 @@ by the graph around each tool and model call.
 `mcp_server/server.py` binds the same registry to a Model Context Protocol (MCP) server for the principal in `HR_TOKEN`; a Claude
 Desktop call lands in the same `run_tool`, so a write tool answers `approval_required` there: only the graph passes `approved=True`.
 
-## 7. Generate
+## 8. Generate
 
 `agent/graph.py` `act` stores the tools' chunks, facts and citations in state (a lookup the model planned
 nothing for still gets one `search_documents`); `_evidence` builds the
@@ -98,7 +113,7 @@ with the abstain text") and the evidence to `ModelGateway.complete(ModelRole.gen
 evidence, the model is not called at all. `gateway/bedrock.py` picks Claude Sonnet 4.5 for this role;
 `gateway/fake.py` builds a deterministic answer from the evidence lines.
 
-## 8. Verify
+## 9. Verify
 
 `verify` node: `ModelRole.verify` (Claude Haiku 4.5 on Bedrock) receives `ANSWER` and `EVIDENCE` and
 returns `{grounded, confidence, unsupported_claims}` as JavaScript Object Notation (JSON), parsed by `extract_json` into a
@@ -106,14 +121,17 @@ returns `{grounded, confidence, unsupported_claims}` as JavaScript Object Notati
 otherwise regenerate once with the unsupported claims named in the system prompt, then `abstain`.
 `tests/test_agent.py::test_ungrounded_draft_is_regenerated_then_abstains` proves the loop and its ceiling.
 
-## 9. Answer, audit
+## 10. Answer, output guardrail, audit
 
 `answer` node maps the `[n]` markers in the draft back to citations (`Citation` carries document id, chunk
 id, title, uri, section, version, snippet) and `_finish` writes the `answer` audit row: abstained, grounded,
 citations, model, latency. `abstain` writes the same row with a reason (`policy_denied`, `out_of_scope`,
-`no_authorized_evidence`, `not_grounded`). `api/app.py` `_sse` streams every `TurnEvent` the nodes emitted.
+`no_authorized_evidence`, `not_grounded`). At the API boundary `_guard_output` runs
+`guardrails/output.py` `check_output`, redacts personal data, flags prose with zero citations, optionally
+applies the managed Bedrock Guardrail, emits `guardrail {stage:"output", redactions, uncited}`, and then
+leaves `answer` as the final event. `api/app.py` `_sse` streams the sequence.
 
-## 10. Checkpoint, replay, human in the loop (HITL)
+## 11. Checkpoint, replay, human in the loop (HITL)
 
 Every node's return is a checkpoint written by the LangGraph saver: `AsyncPostgresSaver` on the control
 database (`graph.startup`), `MemorySaver` in tests. `replay` lists a thread's checkpoints oldest first with
@@ -135,3 +153,4 @@ resume cannot run it twice and a second ticket with different arguments still ru
 | Change a query | `retrieval/sql.py` only | `tests/test_architecture.py` guards the predicate |
 | Add a graph node | `agent/graph.py` `_graph()`, the README and ARCHITECTURE state diagrams | `tests/test_agent.py` |
 | Add a source system | `ingest/<source>.py` + an `acl.py` mapping; `writer.py` is source-agnostic | `tests/test_ingest.py` |
+| Change turn-boundary safety | `guardrails/` and `api/app.py`; update `GUARDRAILS.md` | `tests/test_guardrails.py`, `tests/test_api.py` |

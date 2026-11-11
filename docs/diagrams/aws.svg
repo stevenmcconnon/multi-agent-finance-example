@@ -26,8 +26,8 @@
 <text x="586" y="226" font-size="11.5" fill="#fff" opacity="0.92">db/policies/*.cedar</text>
 <rect x="726" y="172" width="142" height="66" rx="8" fill="#6d28d9"/>
 <text x="738" y="193" font-size="13" font-weight="600" fill="#fff">Amazon Bedrock</text>
-<text x="738" y="211" font-size="11.5" fill="#fff" opacity="0.92">Claude Sonnet / Haiku 4.5</text>
-<text x="738" y="226" font-size="11.5" fill="#fff" opacity="0.92">Titan v2 512, Cohere Rerank</text>
+<text x="738" y="211" font-size="10.5" fill="#fff" opacity="0.92">models · embed · rerank</text>
+<text x="738" y="226" font-size="10.5" fill="#fff" opacity="0.92">managed Guardrails</text>
 <rect x="878" y="172" width="142" height="66" rx="8" fill="#0f766e"/>
 <text x="890" y="193" font-size="13" font-weight="600" fill="#fff">S3 raw filings</text>
 <text x="890" y="211" font-size="11.5" fill="#fff" opacity="0.92">S3_RAW_BUCKET</text>
@@ -42,7 +42,7 @@
 <text x="312" y="413" font-size="13" font-weight="600" fill="#6b7280">ECS Fargate cluster  modules/compute</text>
 <rect x="320" y="420" width="240" height="80" rx="8" fill="#1d4ed8"/>
 <text x="332" y="441" font-size="14" font-weight="600" fill="#fff">api service</text>
-<text x="332" y="459" font-size="11.5" fill="#fff" opacity="0.92">FastAPI + LangGraph + harness</text>
+<text x="332" y="459" font-size="11.5" fill="#fff" opacity="0.92">FastAPI + LangGraph + guardrails</text>
 <text x="332" y="474" font-size="11.5" fill="#fff" opacity="0.92">autoscaled on CPU</text>
 <text x="332" y="489" font-size="11.5" fill="#fff" opacity="0.92">sidecar: ADOT collector → CloudWatch</text>
 <rect x="320" y="540" width="240" height="80" rx="8" fill="#0f766e"/>
@@ -63,7 +63,7 @@
 <text x="872" y="489" font-size="11.5" fill="#fff" opacity="0.92">audit, checkpoints, jobs</text>
 <rect x="860" y="520" width="140" height="60" rx="8" fill="#b45309"/>
 <text x="872" y="541" font-size="13" font-weight="600" fill="#fff">ElastiCache Valkey</text>
-<text x="872" y="559" font-size="11.5" fill="#fff" opacity="0.92">group cache, TTL 300 s</text>
+<text x="872" y="559" font-size="11.5" fill="#fff" opacity="0.92">group cache + rate limits</text>
 <rect x="860" y="640" width="140" height="80" rx="8" fill="#334155"/>
 <text x="872" y="661" font-size="13" font-weight="600" fill="#fff">Secrets Manager</text>
 <text x="872" y="679" font-size="11.5" fill="#fff" opacity="0.92">RDS password by ARN,</text>

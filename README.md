@@ -1,20 +1,43 @@
-# Permission-Safe Multi-Agent Finance Assistant
+# Multi-Agent RAG Finance Assistant
 
-A working reference project for building agentic artificial intelligence (AI) systems that can research
-company documents, respect document-level permissions, cite their evidence, and require human approval
-before taking action.
+A production-shaped reference architecture for **multi-agent artificial intelligence (AI)** and
+**retrieval-augmented generation (RAG)**: specialized AI agents research company documents, enforce
+document-level permissions, cite their evidence, and require human approval before taking action.
 
 [![ci](https://github.com/stevenmcconnon/multi-agent-finance-example/actions/workflows/ci.yml/badge.svg)](https://github.com/stevenmcconnon/multi-agent-finance-example/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB.svg)](pyproject.toml)
 [![terraform](https://img.shields.io/badge/terraform-1.6-7B42BC.svg)](infra/terraform)
 
-This repository is a portfolio demonstration of agentic AI engineering applied to a finance use case. It
-shows the parts that are easy to omit from a prototype but essential in a credible enterprise system:
-identity, authorization, grounded retrieval, specialized agents, human approval, auditability, evaluation,
-observability, and deployable infrastructure.
+Built as an **agentic AI architect and engineer portfolio project**, the repository demonstrates how to
+move from a generative AI and large language model (LLM) prototype to an enterprise-ready design. It
+combines multi-agent orchestration, permission-aware RAG, LLM guardrails, human-in-the-loop approval, Model Context Protocol
+(MCP) tools, evaluation, observability, and Amazon Web Services (AWS) infrastructure in one runnable system.
 
-![A live turn showing the specialized agents and the deterministic, model, and human steps](docs/screenshots/12-agent-team.png)
+![An annotated multi-agent RAG turn showing the user question, policy guard, authorized retrieval, writing, and verification](docs/diagrams/multi-agent-rag-turn-annotated.png)
+
+The annotated turn shows the core architecture in the running product: the **Guard** authorizes the
+request, the **Researcher** retrieves only permitted evidence, the **Writer** drafts from that evidence,
+and the **Judge** verifies the answer before delivery.
+
+## Agentic AI architecture highlights
+
+- **Multi-agent system:** a Supervisor coordinates Guard, Planner, Researcher, Writer, Judge, and human
+  Approver roles through a checkpointed LangGraph state machine.
+- **Permission-aware RAG pipeline:** a Postgres and pgvector vector database combines semantic search,
+  keyword search, and reranking while applying access control before evidence enters the LLM context window.
+- **Agent tools, tool calling, and MCP:** every tool call uses the same policy-enforced runner whether it
+  comes from the web application, the agent graph, or a Model Context Protocol client.
+- **LLM safety and guardrails:** deterministic identity, authorization, tool policy, budgets,
+  idempotency, and citation checks bound the non-deterministic model steps.
+- **Human-in-the-loop agent workflow:** write and money actions pause for explicit approval and can execute
+  only once after resumption.
+- **LLMOps and AI observability:** audit events, OpenTelemetry traces, graph checkpoints, adversarial
+  evaluations, and citation-quality tests make agent behavior inspectable.
+- **Enterprise AI security and governance:** fail-closed authorization, prompt-injection tests,
+  permission-leak evaluations, audit trails, and explicit demo limitations make trust boundaries visible.
+- **Cloud architecture:** Docker supports the local development stack, while Terraform describes an AWS
+  deployment using Bedrock, Cognito, Verified Permissions, Fargate, and managed data services.
 
 ## What the demo does
 
@@ -30,9 +53,9 @@ A user can:
 - approve or deny a proposed write action; and
 - replay the full decision trail after the turn completes.
 
-The important result is not simply “chat with documents.” It is a controlled agent system in which an
-unauthorized passage never reaches the model, financial numbers come from structured facts, and a model
-cannot execute a write by itself.
+The important result is not simply “chat with documents.” It is a controlled multi-agent RAG system in
+which an unauthorized passage never reaches the LLM, financial numbers come from structured facts, and an
+AI agent cannot execute a write by itself.
 
 ### The five-minute walkthrough
 
@@ -46,10 +69,12 @@ cannot execute a write by itself.
 
 See [the complete demo script](docs/DEMO.md) for the prompts, screenshots, and narration.
 
-## How the agent team works
+## How the multi-agent system works
 
-A supervisor coordinates six specialized roles. Deterministic code owns permissions, tool execution, and
-routing; models handle interpretation and language; a person owns approval.
+A Supervisor orchestrates six specialized agent roles. Deterministic code owns permissions, tool
+execution, and routing; LLM agents handle interpretation and language; a person owns approval. This
+separation makes the multi-agent workflow easier to test, audit, and evolve than a single unconstrained
+agent with direct access to data and tools.
 
 | Role | Type | Responsibility |
 |---|---|---|
@@ -61,31 +86,25 @@ routing; models handle interpretation and language; a person owns approval.
 | **Writer** | Model | Drafts an answer using only the retrieved evidence |
 | **Judge** | Model | Checks the draft against that evidence before it is returned |
 
-```mermaid
-flowchart LR
-    Q[Question] --> G[Guard<br/>identity and policy]
-    G --> P[Planner<br/>choose allowed tools]
-    P --> R[Researcher<br/>retrieve authorized evidence]
-    R -. write action .-> H{Human approval}
-    H --> R
-    R --> W[Writer<br/>draft from evidence]
-    W --> J[Judge<br/>verify claims]
-    J -->|grounded| A[Answer with citations]
-    J -->|unsupported| X[Retry once or abstain]
-```
+![Color-coded multi-agent RAG architecture showing the Supervisor, specialized agents, knowledge layer, guarded tools, model gateway, and human approval](docs/diagrams/multi-agent-rag-architecture.svg)
 
-The turn is orchestrated with LangGraph. A separate Temporal workflow handles document ingestion, where
-long-running retries and resumable jobs matter more than conversational state.
+Teal components are deterministic controls, purple components are model-driven agents, and amber marks the
+human approval boundary. LangGraph orchestrates the interactive agent turn. A separate Temporal workflow
+handles document ingestion, where long-running retries and resumable jobs matter more than conversational
+state.
 
 ## System design at a glance
 
 The system follows one request through seven layers:
 
 1. **Experience:** a React web application, streaming FastAPI interface, and Model Context Protocol server.
-2. **Orchestration:** the supervisor graph coordinates the agent team and stores checkpoints.
-3. **AI harness:** one guarded tool runner applies policy, approval, timeouts, retries, budgets, and idempotency.
-4. **Knowledge:** hybrid semantic and keyword retrieval filters permissions inside the database query.
-5. **Models:** one gateway selects local deterministic behavior or Amazon Bedrock models.
+2. **Agent orchestration:** the LangGraph Supervisor coordinates the multi-agent workflow and stores checkpoints.
+3. **AI harness and guardrails:** one guarded agent-tool runner applies policy, approval, timeouts, retries,
+   budgets, and idempotency; turn-boundary checks redact personal data, tag injection patterns, check output,
+   and rate-limit each principal.
+4. **RAG and knowledge:** pgvector semantic search, keyword retrieval, reranking, and structured facts
+   share a database-level permission filter.
+5. **Models:** one LLM gateway selects local deterministic behavior or Amazon Bedrock foundation models.
 6. **Data:** an ingestion workflow parses filings into searchable passages and structured financial facts.
 7. **Platform:** Docker runs the local stack; Terraform describes the Amazon Web Services deployment.
 
@@ -110,6 +129,7 @@ adapter choices, read the [architecture guide](docs/ARCHITECTURE.md).
 | [`apps/web/`](apps/web/) | React user interface: sign-in personas, chat, approval cards, documents, and replay |
 | [`services/finance_agents/agent/`](services/finance_agents/agent/) | Supervisor graph, agent roles, state, checkpoints, and approval interrupts |
 | [`services/finance_agents/harness/`](services/finance_agents/harness/) | Identity, tool registry, guarded tool runner, budgets, retries, and idempotency |
+| [`services/finance_agents/guardrails/`](services/finance_agents/guardrails/) | Input/output checks, personal-data redaction, per-user rate limiting, and Bedrock Guardrails |
 | [`services/finance_agents/retrieval/`](services/finance_agents/retrieval/) | Permission-filtered semantic, keyword, and structured-fact retrieval |
 | [`services/finance_agents/authz/`](services/finance_agents/authz/) | Cedar policy adapters, group resolution, and audit records |
 | [`services/finance_agents/gateway/`](services/finance_agents/gateway/) | The single gateway for local and Amazon Bedrock model backends |
@@ -185,6 +205,12 @@ takes a lower-cost path, the tradeoff is stated explicitly.
 > In this demo: deterministic language behavior and local embedding and reranking models are the defaults,
 > because the quickstart must run offline without cloud credentials.
 
+> In production: the Terraform-managed Bedrock Guardrail filters every model call and both ends of a turn,
+> alongside load-balancer and web-application-firewall limits.
+>
+> In this demo: deterministic input/output checks and the Redis per-principal limit still run, but managed
+> content classification is off, because the local stack makes no AWS calls.
+
 > In production: each person signs in through a real identity provider and approvals may be routed to an
 > enterprise workflow.
 >
@@ -203,6 +229,7 @@ uv run pytest tests evals/suites -q
 The automated checks cover:
 
 - identity and authorization failures;
+- malformed input, prompt-injection tagging, personal-data redaction, rate limiting, and output checks;
 - permission filtering for passages and financial facts;
 - grounded answers, abstention, and citation ownership;
 - human approval and exactly-once write behavior;
@@ -224,6 +251,7 @@ Bedrock · Amazon Cognito · Amazon Verified Permissions · OpenTelemetry · Pho
 - [Code tour](docs/TOUR.md) — one request from token verification to stored checkpoint
 - [Architecture](docs/ARCHITECTURE.md) — layers, interfaces, data stores, and production tradeoffs
 - [Security](docs/SECURITY.md) — trust boundaries, threats, and controls
+- [Guardrails](docs/GUARDRAILS.md) — every control mapped to its owner, test, and local/cloud behavior
 - [Architecture decisions](docs/adr/README.md) — why the major implementation choices were made
 - [Documentation index](docs/README.md) — all guides and dated review records
 
