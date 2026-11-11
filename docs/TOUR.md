@@ -80,7 +80,7 @@ injects a fetch that asserts the predicate and the principal's groups on each ca
 ## 6. Rerank
 
 Still in `retrieve`: `Reranker.rerank(query.original, candidates, rerank_top_n)`. `retrieval/rerank.py`
-offers `BAAI/bge-reranker-base` locally, Cohere Rerank 3.5 through `bedrock-runtime invoke_model`, or
+offers `Xenova/ms-marco-MiniLM-L-12-v2` locally, Cohere Rerank 3.5 through `bedrock-runtime invoke_model`, or
 `NoopReranker` for a degraded mode. Documents are sent as text only and mapped back by index. The reranker
 receives candidates that passed the predicate and nothing else. Then the relevance floor: chunks scoring below
 the reranker's own floor (`Reranker.min_score`; `HR_RERANK_MIN_SCORE` overrides it) are dropped, so readable-but-irrelevant evidence counts as absent and the turn abstains

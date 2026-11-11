@@ -38,22 +38,29 @@ _COMPANY_TICKER = {
     "oracle": "ORCL",
     "intel": "INTC",
 }
-_NOT_TICKERS = {"US", "SEC", "EPS", "ACL", "XBRL"}
+_NOT_TICKERS = {"US", "SEC", "EPS", "ACL", "XBRL", "CFO", "CEO"}
 # Phrase -> XBRL concept (names from ingest/facts.py CONCEPTS). Order matters: a matched phrase is removed, so
 # "earnings per share" is not also read as "earnings" and "net sales" not also as "net income".
 _CONCEPTS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"\bearnings per share\b|\beps\b"), "EarningsPerShareDiluted"),
+    (re.compile(r"(?:\bearn\w*\s+)?(?<!dividend )(?<!dividends )\bper share\b|\beps\b"), "EarningsPerShareDiluted"),
     (re.compile(r"\bnet sales\b|\brevenues?\b|\bsales\b"), "Revenues"),
-    (re.compile(r"\bnet income\b|\bprofits?\b|\bearnings\b"), "NetIncomeLoss"),
+    (re.compile(r"\bnet income\b|\bprofits?\b|\bearn(?:ings|ed|s)?\b"), "NetIncomeLoss"),
     (re.compile(r"\btotal assets\b"), "Assets"),
     (re.compile(r"\bliabilities\b"), "Liabilities"),
     (re.compile(r"\bequity\b"), "StockholdersEquity"),
     (re.compile(r"\bcash\b"), "CashAndCashEquivalentsAtCarryingValue"),
 ]
-_VALUE_QUESTION = re.compile(r"\b(?:what (?:was|were|is|are)|how (?:much|many)|percent|margin)\b")
-_COMPARE = re.compile(r"\b(?:change[sd]?|compare[sd]?|versus|vs|growth|grow|grew)\b")
+_VALUE_QUESTION = re.compile(
+    r"\b(?:what (?:was|were|is|are)|what did .*\b(?:earn|make|report)|how (?:much|many)|percent|margin)\b"
+)
+_COMPARE = re.compile(r"\b(?:change[sd]?|compar\w+|versus|vs|grow\w*|grew|increase[sd]?|decrease[sd]?)\b")
+# What makes free text a request about the filings: a question word or an imperative. out_of_scope is the exception.
+_REQUEST = re.compile(
+    r"\b(?:what|how|when|who|whom|whose|why|which|where|did|does|do|is|are|was|were|can|could|would|will|has|have|"
+    r"compare|summari[sz]e|tell|explain|show|give|describe|list|find|outline|name|identify|provide|report|discuss)\b"
+)
 _YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
-_TICKER = re.compile(r"\b[A-Z]{1,5}\b")
+_TICKER = re.compile(r"\b[A-Za-z]{1,5}\b")
 _EVIDENCE_LINE = re.compile(r"^\[(\d+)\] (.*)$", re.MULTILINE)
 _CITE = re.compile(r"\s*\[\d+\]")
 _JSON_BLOCK = re.compile(r"\{.*\}", re.DOTALL)
@@ -67,8 +74,21 @@ _WORD = re.compile(r"[A-Za-z0-9]+")
 _STOP = set(
     "the a an of in on to for and or is are was were be been what which who whom how did does do its it about say "
     "says said from with by that this these those as at has have had their they any such not can could would may "
-    "according describe describes tell show list".split()
+    "according describe describes tell show list compare summarize summarise explain give find outline identify "
+    "provide discuss please you your i me my there".split()
 )
+# Never content: "hello", "thanks, that is great" and the like are not requests about the filings.
+_SMALL_TALK = set("hello hi hey thanks thank thx bye goodbye good morning afternoon evening great cool nice".split())
+# Question words that must appear in the sentence as this phrase (a six-letter stem would let "divided" pass for
+# "dividend"); also the two abbreviations a filing spells out.
+_PHRASES = {
+    "cfo": "chief financial officer",
+    "ceo": "chief executive officer",
+    "dividend": "dividend",
+    "dividends": "dividend",
+    "director": "director",
+    "directors": "director",
+}
 MAX_SENTENCES = 5
 
 
@@ -84,8 +104,9 @@ def format_evidence(texts: list[str]) -> str:
     return "\n".join(f"[{i}] {' '.join(t.split())}" for i, t in enumerate(texts, start=1))
 
 
-# A sentence ends at . ! ? followed by space, except after a name's initial or a title ("Emma N. Walmsley", "Ms.").
-_SENTENCE_END = re.compile(r"(?<=[.!?])(?<!\s[A-Z]\.)(?<!\bMr\.)(?<!\bMs\.)(?<!\bMrs\.)(?<!\bDr\.)\s+")
+# A sentence ends at . ! ? followed by space, except after a name's initial or a title ("Emma N. Walmsley", "Ms.")
+# or before a lowercase letter ("Apple Inc. consummated the issuance").
+_SENTENCE_END = re.compile(r"(?<=[.!?])(?<!\s[A-Z]\.)(?<!\bMr\.)(?<!\bMs\.)(?<!\bMrs\.)(?<!\bDr\.)\s+(?![a-z])")
 _LIST_MARKER = re.compile(r"^\([a-z0-9]{1,3}\)\s+")  # "(b) On November 4, ..." reads as "On November 4, ..."
 
 
@@ -93,39 +114,78 @@ def _sentences(text: str) -> list[str]:
     return [s.strip() for s in _SENTENCE_END.split(text.strip()) if s.strip()]
 
 
+def _words(text: str) -> list[str]:
+    """Lowercase content words: longer than two characters and not a stop word."""
+    return [w for w in (m.lower() for m in _WORD.findall(text)) if len(w) > 2 and w not in _STOP]
+
+
 def _stems(text: str) -> set[str]:
-    """Content words, crudely stemmed: lowercase, plural "s" dropped, first six letters."""
-    return {w.rstrip("s")[:6] for w in (m.lower() for m in _WORD.findall(text)) if len(w) > 2 and w not in _STOP}
+    """Content words, crudely stemmed: plural "s" dropped, first six letters."""
+    return {w.rstrip("s")[:6] for w in _words(text)}
 
 
-def _best_sentence(text: str, want: set[str]) -> tuple[int, str]:
-    """(shared content words, sentence) for the sentence of `text` closest to the question; fragments (table
-    debris, checkbox rows, cut-off starts) never qualify."""
+# Company names and tickers say whose filing, not what is asked: every sentence of an Apple filing says "Apple".
+_ENTITY_WORDS = {w.lower() for w in (*_COMPANY_TICKER, *KNOWN_TICKERS)}
+
+
+def _terms(question: str) -> set[str]:
+    """What a sentence must match: the question's content words without entity words, as a phrase (`_PHRASES`)
+    or a stem."""
+    return {_PHRASES.get(w) or w.rstrip("s")[:6] for w in _words(question) if w not in _ENTITY_WORDS}
+
+
+def _score(terms: set[str], sentence: str) -> int:
+    """How many distinct question terms the sentence matches: a phrase by containment, a stem by prefix
+    ("stand" matches "standing"; stems under four letters must be equal)."""
+    low, stems = sentence.lower(), _stems(sentence)
+
+    def hit(t: str) -> bool:
+        if t in _PHRASES.values():
+            return t in low
+        return any(t == s or (min(len(t), len(s)) >= 4 and (t.startswith(s) or s.startswith(t))) for s in stems)
+
+    return sum(hit(t) for t in terms)
+
+
+def _candidate(s: str) -> bool:
+    """A readable sentence, never table debris: starts with a capital letter, no exhibit-index header or
+    checkbox row, and mostly letters."""
+    return (
+        40 <= len(s) <= 400
+        and s[0].isalpha()
+        and s[0].isupper()
+        # form boxes, exhibit indexes and signature blocks are not prose
+        and not any(junk in s for junk in ("Exhibit Number", "☐", "☒", "/s/"))
+        and sum(c.isalpha() for c in s) * 2 >= sum(not c.isspace() for c in s)
+    )
+
+
+def _best_sentence(text: str, terms: set[str]) -> tuple[int, str]:
+    """(matched question terms, sentence) for the sentence of `text` closest to the question."""
     best = (0, "")
     for s in (_LIST_MARKER.sub("", s) for s in _sentences(text)):
-        if not (40 <= len(s) <= 400) or not (s[0].isupper() or s[0].isdigit()) or "☐" in s or "☒" in s:
-            continue
-        score = len(want & _stems(s))
-        if score > best[0]:
+        if _candidate(s) and (score := _score(terms, s)) > best[0]:
             best = (score, s)
     return best
 
 
 def write_extractive(prompt: str) -> str:
     """The generate role: structured fact lines first, then the most relevant sentence of each evidence item,
-    best first, each kept verbatim (so the verify role can find it) and cited by its evidence index."""
+    best first, each kept verbatim (so the verify role can find it) and cited by its evidence index. A sentence
+    qualifies only when it matches two of the question's terms (one, when the question has only one): a wrong
+    sentence is worse than the abstention."""
     question = prompt.partition("QUESTION:")[2].partition("\n")[0]
-    want = _stems(question)
+    terms = _terms(question)
+    need = max(min(2, len(terms)), 1)
     facts: list[str] = []
     scored: list[tuple[int, str]] = []
     for i, text in _EVIDENCE_LINE.findall(prompt.partition("EVIDENCE:")[2]):
         if _FACT_LINE.search(text):
             facts.append(f"{text} [{i}]")
-        elif (best := _best_sentence(text, want))[0] >= 1:
+        elif (best := _best_sentence(text, terms))[0] >= need:
             scored.append((best[0], f"{best[1]} [{i}]"))
     scored.sort(key=lambda t: -t[0])  # stable: ties keep the reranker's order
-    # A sentence sharing one word ("risks") beside one sharing three ("supply chain risks") is noise: keep those
-    # with at least half the best score.
+    # A sentence sharing two words beside one sharing four is noise: keep those with at least half the best score.
     kept = [s for score, s in scored if score * 2 >= scored[0][0]][:MAX_SENTENCES]
     return " ".join(facts + kept) or ABSTAIN_TEXT
 
@@ -134,24 +194,25 @@ def understand_heuristic(question: str) -> UnderstoodQuery:
     q = question.strip()
     if _TICKET.match(q):
         return UnderstoodQuery(original=question, rewritten=q, intent=QueryIntent.action)
-    if not q or not (
-        q.endswith("?")
-        or re.match(r"^(what|how|when|who|why|which|where|did|does|is|are|list|show|tell)\b", q, re.IGNORECASE)
-    ):
-        return UnderstoodQuery(original=question, rewritten=q, intent=QueryIntent.out_of_scope)
-    entities = {t for t in _TICKER.findall(q) if t in KNOWN_TICKERS or len(t) >= 2 and t not in _NOT_TICKERS}
-    entities |= {_COMPANY_TICKER[name.lower()] for name in _COMPANY.findall(q)}
     lower = q.lower()
+    entities = {t.upper() for t in _TICKER.findall(q) if t.upper() in KNOWN_TICKERS}
+    entities |= {t for t in _TICKER.findall(q) if t.isupper() and len(t) >= 2 and t not in _NOT_TICKERS}
+    entities |= {_COMPANY_TICKER[name.lower()] for name in _COMPANY.findall(q)}
     concepts: list[str] = []
     rest = lower
     for pattern, concept in _CONCEPTS:
         if pattern.search(rest):
             concepts.append(concept)
             rest = pattern.sub(" ", rest)
+    asks = q.endswith("?") or bool(_REQUEST.search(lower))
+    # A bare "aapl revenue 2025" names a company and a figure: a request for that figure.
+    keywords = bool(entities and concepts) and not asks
+    if len(set(_words(q)) - _SMALL_TALK) < 2 or not (asks or keywords):
+        return UnderstoodQuery(original=question, rewritten=q, intent=QueryIntent.out_of_scope)
     years = list(dict.fromkeys(_YEAR.findall(q)))
     if concepts and (len(years) >= 2 or _COMPARE.search(lower)):
         intent = QueryIntent.compare
-    elif concepts and _VALUE_QUESTION.search(lower):
+    elif concepts and (keywords or _VALUE_QUESTION.search(lower)):
         intent = QueryIntent.numeric
     else:
         intent = QueryIntent.lookup

@@ -98,6 +98,7 @@ export default function ChatPage() {
       const turn: Turn = { question: t.question, items: [], user: me.user_id, groups: me.groups };
       setTurns([turn]);
       await streamChat(t.question, tid, (ev) => pushEvent({ event: ev }));
+      window.scrollTo({ top: 0 }); // both outcome strips sit at the top; that contrast is the point of a re-ask
     });
 
   const decide = (approved: boolean) => {

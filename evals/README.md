@@ -2,10 +2,10 @@
 
 Two pytest suites that run offline on every continuous integration (CI) run, and two optional graded evals against the live stack.
 
-## Suites (`uv run pytest evals/suites -q`)
+## Suites (`uv run --extra dev pytest evals/suites -q`)
 
 Both suites run the real turn graph (`finance_agents.agent.graph`), the real tool door (`harness.runner`), the
-real Cedar policies and the `FakeGateway`, with `MemorySaver` checkpoints. `suites/corpus.py` replaces the
+real Cedar policies and the `FakeGateway` (the offline stub), with `MemorySaver` checkpoints. `suites/corpus.py` replaces the
 two Structured Query Language (SQL)-backed stores with `FakeRetriever` and `FakeFactStore` over a five-document fixture (Apple (AAPL) and Microsoft (MSFT)
 Form 10-K (annual report) and Form 8-K (current report) filings in org `acme`, one document in another org). The fakes apply the same org + reader-group
 predicate `retrieval/sql.py` applies in SQL; the SQL itself is proven in `tests/test_retrieval.py` and
@@ -24,8 +24,8 @@ ingestion.
   is refused by Cedar (not merely hidden) and that another user cannot replay, resume or continue a thread.
 - **`test_citation_quality.py`** over `datasets/qa.jsonl` (12 cases). An `answer` case must be
   non-abstained, verifier-grounded, carry at least one citation, cite only documents the asking user may
-  read, and cite the form in `must_cite_form`; an `abstain` case must return the abstain text with no
-  citations. There are no gold answers (architecture decision record (ADR) 0004): the fixture text is neutral prose under real Electronic Data Gathering, Analysis, and Retrieval system (EDGAR) item
+  read, and cite the form in `must_cite_form`; an `abstain` case must return no
+  citations, the case's `reason` and that reason's sentence. There are no gold answers (architecture decision record (ADR) 0004): the fixture text is neutral prose under real Electronic Data Gathering, Analysis, and Retrieval system (EDGAR) item
   headings, and the numeric case's fact value is `1.0` flagged `fixture`, never asserted.
 
 A fixture limit worth knowing: `FakeRetriever` drops zero-overlap chunks, standing in for the rerank relevance
@@ -52,7 +52,7 @@ configured gateway, build each case's contexts from the chunks the turn *cited* 
 nothing outside the caller's permissions enters the eval dataset), score them with a judge model, print
 per-case results and write rows to `eval_records` (`suite`, `case_id`, `thread_id`, `scores`, `passed`).
 They skip, printing why, when the `evals` extra is not installed, when `HR_MODEL_BACKEND` is not `bedrock`
-(the judge needs a real model; the fake gateway would grade itself), or when `DATABASE_URL` does not answer.
+(the judge needs a real model; the offline stub would grade itself), or when `DATABASE_URL` does not answer.
 The principal comes from `identity.verify_token(devtoken.mint(user))`, the production path.
 
 DeepEval's contextual *precision* metric needs a gold answer per case; the dataset has none, so contextual

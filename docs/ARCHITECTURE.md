@@ -59,7 +59,7 @@ call: Converse with `toolConfig` (native tool use) on the generate model, over t
 offers; if that call fails, the gateway falls back to the deterministic heuristic and says so in the node's status event. `FakeGateway`, the offline stub
 (it reports itself as `offline-stub`), answers deterministically from the numbered evidence lines in the prompt and plans with `plan_heuristic`; it is what tests and the $0
 quickstart run. `make up-bedrock` runs the local stack with the Claude models instead (embeddings and reranking stay local); it calls AWS and costs money per question. Embedders produce 512-dimension vectors on both backends ([ADR 0005](adr/0005-512-dim-embeddings.md));
-rerankers are Cohere Rerank 3.5 or a local Best General Embeddings (BGE) cross-encoder, with `none` as a degraded mode.
+rerankers are Cohere Rerank 3.5 or a local MiniLM cross-encoder (`Xenova/ms-marco-MiniLM-L-12-v2`), with `none` as a degraded mode.
 When `BEDROCK_GUARDRAIL_ID` is configured, every Converse call carries `guardrailConfig`; the API also calls
 the same managed guardrail directly on the question and final answer. It is disabled in the offline local
 stack. The deterministic checks that still run locally are owned by L5, below.
@@ -69,7 +69,7 @@ stack. The deterministic checks that still run locally are owned by L5, below.
 `retrieval/sql.py` owns the one access control list (ACL) predicate and the three candidate queries that embed it (dense cosine
 over the Hierarchical Navigable Small World index (HNSW), sparse `websearch_to_tsquery` over the generated `tsvector`, facts by entity and
 concept). `hybrid.py` runs dense and sparse with the same parameters, fuses with reciprocal rank fusion
-(k = 60), reranks to `rerank_top_n`, drops chunks the reranker scores below its own floor (`Reranker.min_score`: 0.0 for the local BGE logits, 0.15 for Cohere Rerank's 0..1 relevance; `HR_RERANK_MIN_SCORE` overrides it)
+(k = 60), reranks to `rerank_top_n`, drops chunks the reranker scores below its own floor (`Reranker.min_score`: 0.0 for the local MiniLM cross-encoder logits, 0.15 for Cohere Rerank's 0..1 relevance; `HR_RERANK_MIN_SCORE` overrides it)
 (authorized but irrelevant evidence counts as absent; [ADR 0009](adr/0009-rerank-relevance-floor.md)), and
 writes one `retrieval` audit row. The dense query is pinned to the stored `embedding_model` and runs with
 `hnsw.iterative_scan = relaxed_order`, so a reader permitted few chunks still gets `k` rows past the filter. `facts.py` reads structured

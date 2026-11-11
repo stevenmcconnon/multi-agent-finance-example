@@ -49,7 +49,7 @@ from langgraph.types import Command
 
 from ..authz import audit
 from ..config import settings
-from ..contracts import Answer, AnswerReason, ModelRole, Principal, TurnEvent, Verification
+from ..contracts import Answer, AnswerReason, Citation, ModelRole, Principal, TurnEvent, Verification
 from ..gateway import ABSTAIN_TEXT, get_gateway, take_notes
 from ..harness.budget import BudgetExceeded, TurnBudget
 from ..harness.registry import ToolRegistry
@@ -359,13 +359,37 @@ def after_verify(state: TurnState) -> str:
     return "generate" if state["attempts"] < MAX_GENERATE_ATTEMPTS else "abstain"
 
 
+def number_citations(draft: str, evidence: list[tuple[str, Citation]]) -> tuple[str, list[Citation]]:
+    """The reader's view of the citations: markers renumbered 1..n in the order the answer uses them (the Writer
+    cites evidence by its position in the prompt, so a draft can say [7] and [8] with only two sources), and each
+    source's snippet set to the sentence that cites it when that sentence is a quotation of the source."""
+    order: list[int] = []
+    for n in _CITE.findall(draft):
+        if 0 < int(n) <= len(evidence) and int(n) not in order:
+            order.append(int(n))
+    if not order:
+        return draft, [c for _, c in evidence]
+    new = {old: i for i, old in enumerate(order, start=1)}
+    quoted: dict[int, str] = {}
+    pos = 0
+    for m in _CITE.finditer(draft):
+        said, pos = draft[pos : m.start()].strip(), m.end()
+        old_n = int(m.group(1))
+        if old_n in new and old_n not in quoted and said and said in " ".join(evidence[old_n - 1][0].split()):
+            quoted[old_n] = said[:300]
+    text = _CITE.sub(lambda m: f"[{new[int(m.group(1))]}]" if int(m.group(1)) in new else "", draft)
+    citations = [
+        evidence[o - 1][1].model_copy(update={"snippet": quoted[o]}) if o in quoted else evidence[o - 1][1]
+        for o in order
+    ]
+    return text, citations
+
+
 async def answer(state: TurnState) -> dict[str, Any]:
-    evidence = _evidence(state)
-    cited = sorted({int(n) for n in _CITE.findall(state["draft"]) if 0 < int(n) <= len(evidence)})
-    citations = [evidence[i - 1][1] for i in cited] or [c for _, c in evidence]
+    text, citations = number_citations(state["draft"], _evidence(state))
     v = Verification(**state["verification"])
     ans = Answer(
-        text=state["draft"],
+        text=text,
         citations=citations,
         confidence=v.confidence,
         reason="answered",

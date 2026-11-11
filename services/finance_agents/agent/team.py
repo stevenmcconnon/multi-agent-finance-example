@@ -109,6 +109,8 @@ def evidence(state: TurnState) -> list[tuple[str, Citation]]:
     for f in state.get("facts", []):
         prov = f.get("provenance") or {}
         text = f.get("line") or fact_line(f)
+        # The period is the fact's own: the `fy` in the provenance is the FILING's year, the same on every row.
+        when = f"period ended {f['period_end']}" if f.get("period_start") else f"as of {f['period_end']}"
         items.append(
             (
                 text,
@@ -116,7 +118,11 @@ def evidence(state: TurnState) -> list[tuple[str, Citation]]:
                     document_id=f["document_id"],
                     title=prov.get("title") or None,
                     uri=str(prov.get("uri", "")),
-                    section=f"XBRL fact {f['concept']} {prov.get('fp') or ''} {prov.get('fy') or ''}".strip(),
+                    section=(
+                        "Calculator: derived from the two facts above"
+                        if f.get("line")
+                        else f"XBRL fact {f['concept']}, {when}"
+                    ),
                     version=prov.get("version") or prov.get("accn") or None,
                     snippet=text,
                 ),
@@ -235,24 +241,33 @@ class Researcher:
     @staticmethod
     def _select(facts: list[dict[str, Any]], period_hint: str | None) -> list[dict[str, Any]]:
         """Drop repeats of one (entity, concept, period, value), then keep the fiscal years the question named
-        when any fact matches one. The fiscal year is the year the period ENDS: the `fy` in EDGAR's provenance
-        is the fiscal year of the FILING (2026 on every row of a fiscal-2026 10-K), so it cannot tell a filing's
-        three reported years apart."""
+        when any fact matches one; a question that names no year gets only the latest period of each (entity,
+        concept). The fiscal year is the year the period ENDS: the `fy` in EDGAR's provenance is the fiscal year
+        of the FILING (2026 on every row of a fiscal-2026 10-K), so it cannot tell a filing's three reported
+        years apart."""
         unique = list({(f["entity"], f["concept"], f["period_end"], f["value"]): f for f in facts}.values())
-        years = set((period_hint or "").split(","))
+        if not period_hint:
+            latest: dict[tuple[str, str], dict[str, Any]] = {}
+            for f in unique:  # two XBRL revenue concepts are one thing to the reader: keyed by the label
+                key = (f["entity"], CONCEPT_LABELS.get(f["concept"], f["concept"]))
+                if key not in latest or str(f["period_end"]) > str(latest[key]["period_end"]):
+                    latest[key] = f
+            return list(latest.values())
+        years = set(period_hint.split(","))
         named = [f for f in unique if str(f.get("period_end") or "")[:4] in years]
         return named or unique
 
     async def _change(
         self, state: TurnState, facts: list[dict[str, Any]], budget: dict[str, Any]
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-        """Exactly two periods of one concept: the difference and the percent change, computed by the
-        `calculator` tool through the door (on the timeline, charged to the budget). Returns (evidence rows,
-        tool events, budget); no row when the caller's role may not use the calculator, the budget has no room
-        for the two calls, or a call fails."""
+        """A comparison question with exactly two periods of one concept: the difference and the percent change,
+        computed by the `calculator` tool through the door (on the timeline, charged to the budget). Returns
+        (evidence rows, tool events, budget); no row when the caller's role may not use the calculator, the budget
+        has no room for the two calls, or a call fails."""
         left = TurnBudget(**budget)
         if (
-            len(facts) != 2
+            state["understood"]["intent"] != "compare"
+            or len(facts) != 2
             or len({(f["entity"], f["concept"], f["unit"]) for f in facts}) != 1
             or facts[0]["period_end"] == facts[1]["period_end"]
             or "calculator" not in {t.name for t in self.registry.specs_for(principal_of(state))}

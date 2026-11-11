@@ -74,6 +74,31 @@ async def test_fake_never_plans_a_tool_it_was_not_offered():
         ),
         ("What does Amazon say about profit growth?", "compare", ["AMZN"], ["NetIncomeLoss"], None),
         ("Write me a poem about autumn.", "out_of_scope", [], [], None),
+        # out_of_scope is the exception: empty, small talk, under two content words, or nothing like a request
+        ("", "out_of_scope", [], [], None),
+        ("hello", "out_of_scope", [], [], None),
+        ("Thanks, that is great!", "out_of_scope", [], [], None),
+        ("Revenue?", "out_of_scope", [], [], None),
+        ("Apple rocks", "out_of_scope", [], [], None),
+        ("What is the weather today?", "lookup", [], [], None),
+        # imperatives about the filings are in scope
+        ("Compare Apple and Microsoft revenue", "compare", ["AAPL", "MSFT"], ["Revenues"], None),
+        ("Summarize Apple's risk factors", "lookup", ["AAPL"], [], None),
+        ("Tell me about Microsoft's board", "lookup", ["MSFT"], [], None),
+        # known tickers in any case, as whole words; an abbreviation is not a ticker
+        ("what was aapl revenue in 2025", "numeric", ["AAPL"], ["Revenues"], "2025"),
+        ("aapl revenue 2025", "numeric", ["AAPL"], ["Revenues"], "2025"),
+        ("What does the metadata say about revenue?", "lookup", [], ["Revenues"], None),
+        ("Who is Apple's CFO?", "lookup", ["AAPL"], [], None),
+        # per share / EPS is its own concept; earnings alone is net income
+        ("What did Apple earn per share in fiscal 2026?", "numeric", ["AAPL"], ["EarningsPerShareDiluted"], "2026"),
+        ("What is Microsoft's EPS?", "numeric", ["MSFT"], ["EarningsPerShareDiluted"], None),
+        ("What were Apple's earnings in 2026?", "numeric", ["AAPL"], ["NetIncomeLoss"], "2026"),
+        ("How much did Apple earn in 2026?", "numeric", ["AAPL"], ["NetIncomeLoss"], "2026"),
+        ("What did AAPL say about net sales?", "lookup", ["AAPL"], ["Revenues"], None),
+        # comparison words make it a compare
+        ("How much did Apple's revenue increase?", "compare", ["AAPL"], ["Revenues"], None),
+        ("What was Apple's revenue compared to 2024?", "compare", ["AAPL"], ["Revenues"], "2024"),
     ],
 )
 def test_understand_heuristic(question, intent, entities, concepts, period):
@@ -110,11 +135,47 @@ async def test_stub_writer_picks_the_relevant_sentence_and_skips_fragments():
 
 
 async def test_stub_writer_keeps_at_most_five_sentences_and_drops_weak_matches():
-    weak = [f"Paragraph {i} mentions the supply of parts in passing and nothing else at all." for i in range(6)]
-    strong = "Supply chain risks include reliance on outsourcing partners located in a few regions."
-    assert (await _write("What supply chain risks exist?", weak)).count("[") == 5  # equal scores: the first five
-    # one shared word beside three is noise
-    assert await _write("What supply chain risks exist?", [*weak, strong]) == f"{strong} [7]"
+    weak = [f"Paragraph {i} mentions the supply chain in passing and nothing else at all today." for i in range(6)]
+    strong = "Supply chain risks exist because of reliance on outsourcing partners located in a few regions."
+    one = ["A sentence that mentions the supply of parts and shares only that single word with it."]
+    q = "What supply chain risks exist in outsourcing?"
+    assert (await _write(q, weak)).count("[") == 5  # equal scores: the first five
+    assert await _write(q, [*weak, strong]) == f"{strong} [7]"  # two shared words beside five is noise
+    assert await _write(q, one) == ABSTAIN_TEXT  # one shared word never qualifies when the question has two
+
+
+EXHIBITS = (
+    "Exhibits. 2 Exhibit Number Exhibit Description 1.1 Underwriting Agreement, dated November 5, 2026, among Apple "
+    "Inc. and the several underwriters named therein 4.1 Officer's Certificate of Apple Inc., dated November 9, 2026."
+)
+CLOUD = (
+    "These amounts are included in Server products and cloud services, Microsoft 365 Commercial products and cloud "
+    "services, LinkedIn, and Dynamics products and cloud services in the table above."
+)
+
+
+@pytest.mark.parametrize(
+    "question, evidence",
+    [
+        ("Who is Apple's CFO?", EXHIBITS),  # shared only "Apple": an entity word says whose filing, not what
+        ("What notes did Apple issue in November 2026?", EXHIBITS),  # an exhibit index is not a sentence
+        ("What is Microsoft's dividend?", CLOUD),  # shared only "Microsoft"
+        ("What is Microsoft's dividend?", "The board was divided over Microsoft's plans for the coming fiscal year."),
+        ("What were net sales in 2026?", "47,112 net sales 2026 | 39,220 | 12 % | (3) % | 2026 2025 2024 | 10 | 11"),
+        ("What were net sales in 2026?", "2026 net sales grew in every segment the Company reports on, it said."),
+    ],
+)
+async def test_stub_writer_abstains_rather_than_quote_a_wrong_sentence(question, evidence):
+    assert await _write(question, [evidence]) == ABSTAIN_TEXT
+
+
+async def test_stub_writer_matches_spelled_out_titles_and_whole_words():
+    cfo = "Kevan Parekh has served as Senior Vice President and Chief Financial Officer since January 2025."
+    assert await _write("Who is Apple's CFO?", [EXHIBITS, cfo]) == f"{cfo} [2]"
+    paid = "The Company declared a quarterly dividend of $0.91 per share payable in December 2026."
+    assert await _write("What is Microsoft's dividend?", [CLOUD, paid]) == f"{paid} [2]"
+    notes = "On November 10, 2026, Apple Inc. consummated the issuance and sale of its 4.000% Notes due 2029."
+    assert await _write("What notes did Apple issue in November 2026?", [EXHIBITS, notes]) == f"{notes} [2]"
 
 
 async def test_stub_writer_keeps_a_name_with_an_initial_whole_and_drops_the_list_marker():

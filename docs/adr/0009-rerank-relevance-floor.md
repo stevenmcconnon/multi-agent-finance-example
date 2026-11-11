@@ -13,7 +13,7 @@ nonsense answer where an abstention was right.
 ## Decision
 
 After reranking, `retrieval/hybrid.py` drops every chunk whose score is below the reranker's own `min_score`
-(Best General Embeddings (BGE) cross-encoder logits: 0.0; Cohere Rerank relevance: 0.15); `HR_RERANK_MIN_SCORE` overrides it. Authorized but irrelevant evidence counts as absent: with nothing left, `act` has no evidence, the
+(local MiniLM cross-encoder logits: 0.0; Cohere Rerank relevance: 0.15); `HR_RERANK_MIN_SCORE` overrides it. Authorized but irrelevant evidence counts as absent: with nothing left, `act` has no evidence, the
 generator is never called and the turn abstains with reason `no_relevant_evidence`. A chunk with no score (the
 no-op reranker) is kept. The floor runs after the Structured Query Language (SQL) predicate, so it can only remove evidence, never add it.
 

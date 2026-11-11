@@ -60,7 +60,7 @@
 <text x="56" y="576" font-size="12.5" fill="#ffffff">The only code that talks to a model</text>
 <rect x="350" y="510" width="360" height="72" rx="6" fill="#f8fafc"/>
 <text x="362" y="536" font-size="14" fill="#111827">Offline stub gateway (deterministic)</text>
-<text x="362" y="560" font-size="14" fill="#111827">fastembed: jina embeddings · BGE reranker</text>
+<text x="362" y="560" font-size="14" fill="#111827">fastembed: jina embeddings · MiniLM reranker</text>
 <rect x="720" y="510" width="330" height="72" rx="6" fill="#f8fafc"/>
 <text x="732" y="536" font-size="14" fill="#111827">Bedrock: Claude Sonnet 5.5 · Haiku 5.5</text>
 <text x="732" y="560" font-size="14" fill="#111827">Titan Embeddings v2 · Cohere Rerank 3.5</text>

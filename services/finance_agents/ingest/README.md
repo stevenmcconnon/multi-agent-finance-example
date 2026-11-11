@@ -7,7 +7,7 @@ The L2 Data layer: Securities and Exchange Commission (SEC) EDGAR filings into P
 | File | What it owns |
 |---|---|
 | `edgar.py` | EDGAR HTTP client; descriptive User-Agent, at most 10 requests per second. |
-| `parse.py` | Pure: HTML bytes to sections named from the SEC item headings ("Cover page", then for example "Item 1A. Risk Factors"), then `chunk()` (about 700 words, 80 words of overlap). |
+| `parse.py` | Pure: HTML bytes to sections named from the SEC item headings ("Cover page", then for example "Item 1A. Risk Factors"), then `chunk()` (about 300 words, 40 words of overlap). |
 | `facts.py` | Pure: XBRL `companyfacts` to fact rows for one filing. |
 | `acl.py` | `groups_for(form)`: which groups may read a form (the simulated item ACL). |
 | `writer.py` | `write()`: one filing to `documents` + `document_acl` + `chunks` + `facts` in one transaction. |

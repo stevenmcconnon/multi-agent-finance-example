@@ -89,11 +89,11 @@ export default function Nav() {
                   aria-label="Switch persona"
                   value={me.user_id}
                   onChange={(e) => switchTo(e.target.value as (typeof PERSONAS)[number]["user"])}
-                  className="max-w-44 truncate rounded border border-neutral-300 bg-white px-1 py-0.5 text-xs dark:border-neutral-700 dark:bg-neutral-900"
+                  className="rounded border border-neutral-300 bg-white px-1 py-0.5 text-xs dark:border-neutral-700 dark:bg-neutral-900"
                 >
                   {PERSONAS.map((p) => (
-                    <option key={p.user} value={p.user}>
-                      {p.user} ({p.role}: {p.desc})
+                    <option key={p.user} value={p.user} title={p.desc}>
+                      {p.user} ({p.role})
                     </option>
                   ))}
                 </select>

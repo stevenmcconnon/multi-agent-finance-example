@@ -116,7 +116,7 @@ def test_config_names_the_offline_stub_without_auth(client):
             "generate": "offline-stub",
             "verify": "offline-stub",
             "embed": "jinaai/jina-embeddings-v2-small-en",
-            "rerank": "BAAI/bge-reranker-base",
+            "rerank": "Xenova/ms-marco-MiniLM-L-12-v2",
         },
         "auth_mode": "local",
     }

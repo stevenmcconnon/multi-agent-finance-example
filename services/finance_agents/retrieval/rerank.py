@@ -1,6 +1,6 @@
 """Reranker adapters.
 
-fastembed : fastembed.rerank.cross_encoder.TextCrossEncoder, BAAI/bge-reranker-base (local ONNX, lazy)
+fastembed : fastembed.rerank.cross_encoder.TextCrossEncoder, Xenova/ms-marco-MiniLM-L-12-v2 (local ONNX, lazy)
 bedrock   : cohere.rerank-v3-5:0 through bedrock-runtime `invoke_model`. Chosen over
             bedrock-agent-runtime `rerank` because it needs no knowledge-base/ARN plumbing and the
             request/response is the plain Cohere shape ({query, documents, top_n} -> results[{index,
@@ -29,7 +29,9 @@ def _apply(chunks: list[Chunk], scored: list[tuple[int, float]], top_n: int) -> 
 
 
 class FastEmbedReranker:
-    model_name = "BAAI/bge-reranker-base"
+    # Measured on the two annual reports (2026-11-11): against BAAI/bge-reranker-base this model put the right
+    # passage first with a clear positive score more often, in half the time, at a ninth of the download.
+    model_name = "Xenova/ms-marco-MiniLM-L-12-v2"
     min_score = 0.0  # cross-encoder logit: negative = the model judges the pair unrelated
 
     def __init__(self, model_name: str | None = None) -> None:

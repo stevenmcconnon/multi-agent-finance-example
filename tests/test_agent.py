@@ -174,8 +174,59 @@ async def test_two_named_years_are_filtered_and_the_change_comes_from_the_calcul
         "+$38.44 billion (+41.0%), computed by the calculator tool. [3]"
     ) in text
     assert events[-1].data["reason"] == "answered" and events[-1].data["verification"]["grounded"] is True
+    # each source is labelled with its own period, never the filing's fiscal year; the change with what made it
+    assert [c["section"] for c in events[-1].data["citations"]] == [
+        "XBRL fact NetIncomeLoss, period ended 2024-09-28",
+        "XBRL fact NetIncomeLoss, period ended 2026-09-26",
+        "Calculator: derived from the two facts above",
+    ]
     calc_audits = [p for k, p, _ in wired["events"] if k == "tool.call" and p["tool"] == "calculator"]
     assert len(calc_audits) == 2  # through the door: audited and charged
+
+
+THREE_YEARS = [(date(2024, 9, 28), 391_035_000_000), (date(2026, 9, 26), 478_834_000_000), (date(2025, 9, 27), 1)]
+
+
+@pytest.mark.parametrize(
+    "question, lines",
+    [
+        ("What was Apple's revenue?", ["AAPL revenue for the fiscal year ended 2026-09-26"]),
+        ("How did Apple's revenue grow?", ["AAPL revenue for the fiscal year ended 2026-09-26"]),
+        (
+            "Compare Apple and Microsoft revenue",
+            ["AAPL revenue for the fiscal year ended 2026-09-26", "MSFT revenue for the fiscal year ended 2026-09-26"],
+        ),
+    ],
+)
+async def test_no_year_named_keeps_only_the_latest_period_and_runs_no_calculator(wired, question, lines):
+    wired["facts"].rows = THREE_YEARS
+    events = [e async for e in stream_turn(ALICE, question, f"t-latest-{len(question)}")]
+    assert {e.data["tool"] for e in events if e.type == "tool"} == {"facts_sql"}
+    assert [c["snippet"].split(":")[0] for c in events[-1].data["citations"]] == lines
+
+
+def test_latest_period_is_per_entity_and_concept_with_both_revenue_concepts_as_one():
+    def fact(entity, concept, end):
+        return {"entity": entity, "concept": concept, "period_end": end, "value": 1}
+
+    facts = [
+        fact("AAPL", "Revenues", "2024-09-28"),
+        fact("AAPL", "RevenueFromContractWithCustomerExcludingAssessedTax", "2026-09-26"),
+        fact("AAPL", "NetIncomeLoss", "2025-09-27"),
+        fact("MSFT", "Revenues", "2026-06-30"),
+    ]
+    assert team.Researcher._select(facts, None) == facts[1:]
+    balance = {**fact("AAPL", "Assets", "2026-09-26"), "unit": "USD", "document_id": DOC}  # an instant: no start
+    assert team.evidence({"facts": [balance]})[0][1].section == "XBRL fact Assets, as of 2026-09-26"  # type: ignore[typeddict-item]
+    assert team.Researcher._select(facts, "2024") == facts[:1]  # a named year still filters
+    assert team.Researcher._select(facts, "1999") == facts  # and a year no fact has changes nothing
+
+
+async def test_two_periods_without_a_comparison_question_get_no_change_line(wired):
+    wired["facts"].rows = [(date(2024, 9, 28), 1_000_000), (date(2026, 9, 26), 2_000_000)]
+    events = [e async for e in stream_turn(ALICE, "What was AAPL revenue in 2019?", "t-no-compare")]
+    assert [e.data["tool"] for e in events if e.type == "tool"] == ["facts_sql"]  # numeric intent: no calculator
+    assert events[-1].data["text"].count("XBRL concept") == 2 and "Change in" not in events[-1].data["text"]
 
 
 async def test_change_line_is_skipped_when_the_role_may_not_use_the_calculator(wired):

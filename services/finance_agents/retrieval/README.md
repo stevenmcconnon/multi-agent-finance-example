@@ -10,7 +10,7 @@ The L4 Knowledge layer: finds chunks and facts the caller may read, ranks them, 
 | `hybrid.py` | `PgHybridRetriever`: dense (pgvector cosine) plus sparse (`tsvector`), fused by Reciprocal Rank Fusion (RRF, k=60), reranked, then a relevance floor. |
 | `facts.py` | `PgFactStore`: numbers from `facts`, filtered by the same predicate. |
 | `embed.py` | Embedders, both 512 dimensions: fastembed (local) and Titan v2 (Bedrock). |
-| `rerank.py` | Rerankers: BGE cross-encoder (local) and Cohere Rerank (Bedrock). |
+| `rerank.py` | Rerankers: MiniLM cross-encoder (local) and Cohere Rerank (Bedrock). |
 | `calculator.py` | `evaluate()`: AST-walked arithmetic, no `eval`, capped exponents. |
 | `__init__.py` | `get_retriever()`, `get_fact_store()`, `get_embedder()`, `get_reranker()`. |
 

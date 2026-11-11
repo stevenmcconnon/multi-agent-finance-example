@@ -36,7 +36,8 @@ export default function ReplayPage() {
       {checkpoints === null && !error && <p className="text-sm text-neutral-500">Loading…</p>}
       {checkpoints?.length === 0 && <p className="text-sm text-neutral-500">No checkpoints for this thread.</p>}
       <ol className="space-y-4 border-l-2 border-neutral-300 pl-4 dark:border-neutral-700">
-        {checkpoints?.map((c) => (
+        {/* LangGraph writes two bookkeeping checkpoints named __start__ before the first node; they carry no step of the turn */}
+        {checkpoints?.filter((c) => c.node !== "__start__").map((c) => (
           <li key={c.checkpoint_id} className="relative">
             <span className="absolute -left-[23px] top-1.5 h-3 w-3 rounded-full bg-blue-600" />
             <div className="flex flex-wrap items-baseline gap-2 text-sm">

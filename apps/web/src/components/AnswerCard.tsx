@@ -22,7 +22,8 @@ export default function AnswerCard({ answer }: { answer: Answer }) {
       <div className="rounded border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/40">
         <p className="flex flex-wrap items-center gap-2 font-medium text-amber-900 dark:text-amber-200">
           <span className="rounded bg-amber-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">{outcome.badge}</span>
-          {outcome.headline}
+          {/* for a plain non-answer the server's sentence below already says why; the headline would repeat it */}
+          {(!answer.text || answer.reason?.startsWith("action_")) && outcome.headline}
         </p>
         {answer.text && <p className="mt-1 break-words text-sm text-amber-900/80 dark:text-amber-200/80">{answer.text}</p>}
       </div>

@@ -107,8 +107,9 @@ def _sentences(text: str, size: int) -> list[str]:
     return out
 
 
-def chunk(sections: list[Section], size: int = 700, overlap: int = 80) -> list[Section]:
+def chunk(sections: list[Section], size: int = 300, overlap: int = 40) -> list[Section]:
     """~`size`-word chunks per section with `overlap` trailing words carried into the next one.
+    300 words fit the local reranker's 512-token window; at 700 it read only the first half of each chunk.
     Boundaries fall on sentence ends unless a single sentence exceeds `size`."""
     out: list[Section] = []
     for section, text in sections:
