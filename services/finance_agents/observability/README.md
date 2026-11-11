@@ -6,7 +6,7 @@ OpenTelemetry (OTel) traces and Prometheus metrics for the API; this is the in-a
 
 | File | What it owns |
 |---|---|
-| `otel.py` | `setup_otel(app)`: one tracer provider exporting to the OTel collector and to Phoenix, FastAPI and psycopg instrumentation, LangGraph spans, and `/metrics`. `record_tool_span()`: one TOOL span per guarded tool call, called by `harness/runner.py`. |
+| `otel.py` | `setup_otel(app)`: one tracer provider exporting to the OTel collector and to Phoenix, FastAPI instrumentation (health checks excluded), LangGraph spans, and `/metrics`. `record_tool_span()`: one TOOL span per guarded tool call, called by `harness/runner.py`. |
 | `__init__.py` | Package marker. |
 
 ## How it is used

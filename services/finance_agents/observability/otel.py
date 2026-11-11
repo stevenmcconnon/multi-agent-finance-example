@@ -1,6 +1,6 @@
 """setup_otel(app): one TracerProvider exporting to the OTel collector AND to Phoenix (LangGraph spans via
-openinference), FastAPI + psycopg instrumentation, Prometheus /metrics. Startup never fails here: a
-collector that is down only costs dropped spans (BatchSpanProcessor logs and moves on).
+openinference), FastAPI instrumentation, one TOOL span per guarded tool call, Prometheus /metrics.
+Startup never fails here: a collector that is down only costs dropped spans (BatchSpanProcessor logs and moves on).
 
 In production: the collector sidecar fans out to X-Ray/Tempo and Phoenix; sampling is set there.
 In this demo: both endpoints are localhost from docker compose and every span is exported, because the
@@ -28,7 +28,6 @@ def setup_otel(app: FastAPI) -> None:
         from opentelemetry import trace
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-        from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
         from opentelemetry.sdk.resources import SERVICE_NAME, Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -45,7 +44,7 @@ def setup_otel(app: FastAPI) -> None:
         trace.set_tracer_provider(provider)
         # The container health check calls /healthz every few seconds; traced, it buries the agent turns.
         FastAPIInstrumentor.instrument_app(app, tracer_provider=provider, excluded_urls="healthz,metrics")
-        PsycopgInstrumentor().instrument(tracer_provider=provider)
+        # No SQL spans: each statement in a streamed turn became its own top-level trace and buried the turns.
         try:
             from openinference.instrumentation.langchain import LangChainInstrumentor
 

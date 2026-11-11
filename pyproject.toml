@@ -31,7 +31,6 @@ dependencies = [
   "opentelemetry-sdk>=1.27",
   "opentelemetry-exporter-otlp-proto-http>=1.27",
   "opentelemetry-instrumentation-fastapi>=0.48b0",
-  "opentelemetry-instrumentation-psycopg>=0.48b0",
   "openinference-instrumentation-langchain>=0.1.30",
   "prometheus-fastapi-instrumentator>=7.0",
   "structlog>=24.1",

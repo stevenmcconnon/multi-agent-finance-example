@@ -14,7 +14,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from opentelemetry.instrumentation.utils import suppress_instrumentation
 from pgvector.psycopg import register_vector_async
 from psycopg import AsyncConnection
 from psycopg.rows import DictRow, dict_row
@@ -134,16 +133,14 @@ async def run_migrations(directory: Path = MIGRATIONS_DIR) -> list[str]:
 
 async def ping(dsn: str | None = None, timeout: float = 2.0) -> bool:
     """True when the database answers; used by tests to skip DB-backed cases."""
-    # Not traced: the health check runs this every few seconds and would flood the trace store.
-    with suppress_instrumentation():
-        try:
-            conn = await asyncio.wait_for(AsyncConnection.connect(dsn or settings.database_url), timeout)
-        except Exception:
-            return False
-        try:
-            await conn.execute("SELECT 1")
-            return True
-        except Exception:
-            return False
-        finally:
-            await conn.close()
+    try:
+        conn = await asyncio.wait_for(AsyncConnection.connect(dsn or settings.database_url), timeout)
+    except Exception:
+        return False
+    try:
+        await conn.execute("SELECT 1")
+        return True
+    except Exception:
+        return False
+    finally:
+        await conn.close()

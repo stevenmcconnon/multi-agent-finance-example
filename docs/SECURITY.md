@@ -136,7 +136,7 @@ Thread ownership (`agent/graph.py::_assert_owner`) checks user *and* org. Tests:
 The `retrieval` audit row lists the document and chunk ids of what was *returned*, after the predicate; the
 `answer` row lists citations; tool rows record arguments and outcome, not retrieved text. Every audit string
 passes through the personal-data redactor. OpenTelemetry spans from `observability/otel.py` wrap FastAPI
-(health checks and `/metrics` excluded), psycopg and LangGraph nodes, plus one TOOL span per guarded tool call
+(health checks and `/metrics` excluded) and LangGraph nodes, plus one TOOL span per guarded tool call
 carrying the tool name, its arguments and "ok" or the error, never the retrieved text. The permission-leak suite walks every audit row and
 stream event for a forbidden document id. The retrieval query may be logged only after input redaction;
 the pattern-matching limits in `GUARDRAILS.md` still apply.
