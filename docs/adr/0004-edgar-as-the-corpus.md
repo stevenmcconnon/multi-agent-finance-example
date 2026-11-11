@@ -1,4 +1,4 @@
-# ADR 0004: SEC EDGAR filings with simulated item-level ACLs as the corpus
+# Architecture decision record (ADR) 0004: U.S. Securities and Exchange Commission (SEC) Electronic Data Gathering, Analysis, and Retrieval system (EDGAR) filings with simulated item-level access control lists (ACLs) as the corpus
 
 Status: accepted · 2026-11
 
@@ -10,7 +10,7 @@ demonstrable with real text, structured numbers and versions.
 
 ## Decision
 
-The corpus is SEC EDGAR: 10-K, 10-Q and 8-K primary documents and the XBRL `companyfacts` numbers for the
+The corpus is SEC EDGAR: Form 10-K (annual report), Form 10-Q (quarterly report) and Form 8-K (current report) primary documents and the eXtensible Business Reporting Language (XBRL) `companyfacts` numbers for the
 same accession. Item-level ACLs are assigned at ingest by form (`ingest/acl.py`: 10-K/10-Q readable by
 finance and analysts, 8-K by engineering too), which gives the three seeded identities visibly different
 views. `documents.source` is `edgar`, `source_id` the accession number, `version` the same (an amendment
@@ -26,7 +26,7 @@ contact e-mail) and keeps under ten requests per second.
 
 - **Synthetic documents.** Fully controlled, but no real parsing problems, no real numbers, and reviewers
   recognise filler.
-- **Wikipedia or a public QA dataset.** Real text, but no natural notion of restricted items or versions,
+- **Wikipedia or a public quality assurance (QA) dataset.** Real text, but no natural notion of restricted items or versions,
   and gold answers would tempt the evals into exact-match grading.
 - **A real SharePoint tenant.** Not shippable in a public repository.
 
@@ -36,5 +36,5 @@ contact e-mail) and keeps under ten requests per second.
   right form from readable documents, and the graded evals use faithfulness and relevancy, not exact text.
 - The ACL mapping is the demo's; nothing in retrieval or policy depends on it, so swapping the connector
   changes `ingest/`, not `retrieval/` or `authz/`.
-- Section detection is shallow on EDGAR's HTML (most has no heading tags); citations still carry document
+- Section detection is shallow on EDGAR's HyperText Markup Language (HTML) (most has no heading tags); citations still carry document
   and chunk, and a layout-aware splitter is a named shortcut in `ingest/parse.py`.

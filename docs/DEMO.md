@@ -7,7 +7,7 @@ what the screen proves.
 
 ## 0:00 Frame it (one sentence, before clicking)
 
-Say: "Enterprise RAG fails in two ways: it shows someone a document they may not read, or an agent does
+Say: "Enterprise retrieval-augmented generation (RAG) fails in two ways: it shows someone a document they may not read, or an agent does
 something nobody approved. This repo makes both impossible by construction and shows the proof on screen."
 
 ## 0:20 Sign in as alice, Documents page
@@ -16,8 +16,8 @@ something nobody approved. This repo makes both impossible by construction and s
 
 Pick **alice** on the sign-in page, then open **Documents**.
 
-Say: "alice is an analyst in finance. The list is what the server lets *her* read: the AAPL 10-K and the
-8-Ks. This is not a UI filter; `GET /documents` runs the same SQL predicate retrieval does."
+Say: "alice is an analyst in finance. The list is what the server lets *her* read: the Apple (AAPL) Form 10-K (annual report) and the
+Form 8-K (current report) filings. This is not a user interface (UI) filter; `GET /documents` runs the same Structured Query Language (SQL) predicate retrieval does."
 
 Proves: item-level permissions exist and are enforced server-side (`api/app.py` `DOCUMENTS_SQL`).
 
@@ -33,7 +33,7 @@ latency), `retrieval` (candidate count, the chunks' sections, from the 10-K), `t
 `answer` with citations. With the fake gateway the plan is a deterministic heuristic; on Bedrock the model
 picks the tools.
 
-Say: "Every chunk you see in `retrieval` passed an ACL predicate inside the SQL, before fusion and rerank.
+Say: "Every chunk you see in `retrieval` passed an access control list (ACL) predicate inside the SQL, before fusion and rerank.
 The second model checked the draft against the evidence before it was shown."
 
 Proves: the turn's shape and the verifier; citations resolve to the 10-K.
@@ -90,16 +90,16 @@ The approval card appears with the tool name, its arguments and the reason. Clic
 Say: "A write tool stops at an interrupt. Denied: audited, nothing changed." Ask again, click **Approve**.
 "Approved: it runs once, under an idempotency key tied to this thread, through the same guarded door every
 tool uses: Cedar, timeout, retries, breaker, audit. alice could not have reached this card; Cedar denies
-write tools to analysts. And the card is the only way in: the same tool over MCP answers
+write tools to analysts. And the card is the only way in: the same tool over Model Context Protocol (MCP) answers
 `approval_required`, because only the graph passes `approved=True` after a human clicks."
 
-Proves: HITL interrupt and resume, risk levels, idempotency, Cedar on tools.
+Proves: human in the loop (HITL) interrupt and resume, risk levels, idempotency, Cedar on tools.
 
 ## 4:30 Close
 
-Say: "Same tools over MCP for Claude Desktop, same door. Terraform for ECS, RDS, Cognito, Verified
+Say: "Same tools over MCP for Claude Desktop, same door. Terraform for Amazon Elastic Container Service (ECS), Amazon Relational Database Service (RDS), Cognito, Verified
 Permissions and Bedrock, about five dollars a day at list price, one command to tear down. The permission
-suite in `evals/` runs eight adversarial cases through the real graph on every CI run. Where the demo takes a
+suite in `evals/` runs eight adversarial cases through the real graph on every continuous integration (CI) run. Where the demo takes a
 cheaper path than production, the code says so in two lines, in the same place."
 
 If asked "what would you change first for production": Verified Permissions instead of in-process Cedar,

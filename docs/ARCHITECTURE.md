@@ -8,31 +8,31 @@ upward. The README's stack diagram is the picture; this page is the text.
 
 ### L1 Cloud / Platform (`infra/`)
 
-Terraform modules under `infra/terraform/modules`: `network` (VPC, public subnets, security groups, VPC
-endpoints for Bedrock, Secrets Manager, ECR, CloudWatch Logs, S3), `database` (RDS Postgres 16 with
+Terraform modules under `infra/terraform/modules`: `network` (Virtual Private Cloud (VPC), public subnets, security groups, VPC
+endpoints for Bedrock, Secrets Manager, Amazon Elastic Container Registry (ECR), CloudWatch Logs, Amazon Simple Storage Service (S3)), `database` (Amazon Relational Database Service (RDS) Postgres 16 with
 pgvector, master password in Secrets Manager), `cache` (ElastiCache Valkey), `identity` (Cognito user pool,
-groups, demo users, PKCE client), `policy` (Verified Permissions store, schema and the policies from
-`db/policies`), `compute` (ECS cluster, ALB, task definitions and services for `api`, `ingest-worker`,
-`temporal`, `phoenix`, autoscaling on CPU, an ADOT sidecar), `web` (S3 bucket behind CloudFront for the
-SPA), `observability` (ADOT log group, optional Managed Grafana), `schedule` (EventBridge Scheduler
-running the ingest CLI as an ECS task). `envs/dev` wires them. `infra/otel` holds the collector config.
+groups, demo users, Proof Key for Code Exchange (PKCE) client), `policy` (Verified Permissions store, schema and the policies from
+`db/policies`), `compute` (Amazon Elastic Container Service (ECS) cluster, Application Load Balancer (ALB), task definitions and services for `api`, `ingest-worker`,
+`temporal`, `phoenix`, autoscaling on processor load, an Amazon Web Services (AWS) Distro for OpenTelemetry (ADOT) sidecar), `web` (S3 bucket behind CloudFront for the
+single-page application (SPA)), `observability` (ADOT log group, optional Managed Grafana), `schedule` (EventBridge Scheduler
+running the ingest command-line interface (CLI) as an ECS task). `envs/dev` wires them. `infra/otel` holds the collector config.
 
-    In production: private subnets, NAT or egress-only endpoints, remote Terraform state with locking.
+    In production: private subnets, network address translation (NAT) or egress-only endpoints, remote Terraform state with locking.
     In this demo: public subnets without NAT and local state, because a clone must `init` with no
     pre-existing resource and the NAT gateway alone would be a fifth of the monthly cost.
 
 ### L2 Data / Pipelines (`ingest/`)
 
 `edgar.py` (fair-access client, 10 requests/second, `User-Agent` from `EDGAR_USER_AGENT`) ->
-`parse.py` (HTML to sections to ~700-word chunks with 80-word sentence-aligned overlap) ->
-`facts.py` (XBRL `companyfacts` filtered to the filing's accession) -> `writer.py` (documents,
+`parse.py` (HyperText Markup Language (HTML) to sections to ~700-word chunks with 80-word sentence-aligned overlap) ->
+`facts.py` (eXtensible Business Reporting Language (XBRL) `companyfacts` filtered to the filing's accession) -> `writer.py` (documents,
 `document_acl`, chunks with embeddings, facts, in one transaction; unchanged content hash writes nothing).
 `acl.py` maps a form to reader groups. `jobs.py` tracks each `(org, source, source_id, version)` in
 `ingest_jobs` with a sha256 idempotency key; the fifth failure sets `status='dead'`. `workflow.py` makes it
 durable on Temporal: `DiscoverWorkflow` starts one `IngestFilingWorkflow` per filing whose workflow id *is*
-the idempotency key, so a second start of the same version is refused by Temporal itself. There is no SQS
-and no queue module ([ADR 0003](adr/0003-temporal-owns-ingestion-durability.md)). EDGAR primary documents are
-HTML, so there is no PDF parser.
+the idempotency key, so a second start of the same version is refused by Temporal itself. There is no Simple Queue Service (SQS)
+and no queue module (architecture decision record [ADR 0003](adr/0003-temporal-owns-ingestion-durability.md)). U.S. Securities and Exchange Commission (SEC) Electronic Data Gathering, Analysis, and Retrieval system (EDGAR) primary documents are
+HTML, so there is no Portable Document Format (PDF) parser.
 
     In production: PDF via PyMuPDF or Textract, for sources that ship PDFs.
     In this demo: HTML only, because EDGAR primary documents are HTML.
@@ -46,32 +46,32 @@ call: Converse with `toolConfig` (native tool use) on the generate model, over t
 offers; if that call fails, the gateway falls back to the deterministic heuristic. `FakeGateway`
 answers deterministically from the numbered evidence lines in the prompt and plans with `plan_heuristic`; it is what tests and the $0
 quickstart run. Embedders produce 512-dimension vectors on both backends ([ADR 0005](adr/0005-512-dim-embeddings.md));
-rerankers are Cohere Rerank 3.5 or a local BGE cross-encoder, with `none` as a degraded mode.
+rerankers are Cohere Rerank 3.5 or a local Best General Embeddings (BGE) cross-encoder, with `none` as a degraded mode.
 
 ### L4 Knowledge / Retrieval (`retrieval/` and `authz/`)
 
-`retrieval/sql.py` owns the one ACL predicate and the three candidate queries that embed it (dense cosine
-over the HNSW index, sparse `websearch_to_tsquery` over the generated `tsvector`, facts by entity and
+`retrieval/sql.py` owns the one access control list (ACL) predicate and the three candidate queries that embed it (dense cosine
+over the Hierarchical Navigable Small World index (HNSW), sparse `websearch_to_tsquery` over the generated `tsvector`, facts by entity and
 concept). `hybrid.py` runs dense and sparse with the same parameters, fuses with reciprocal rank fusion
 (k = 60), reranks to `rerank_top_n`, drops chunks the reranker scores below its own floor (`Reranker.min_score`: 0.0 for the local BGE logits, 0.15 for Cohere Rerank's 0..1 relevance; `HR_RERANK_MIN_SCORE` overrides it)
 (authorized but irrelevant evidence counts as absent; [ADR 0009](adr/0009-rerank-relevance-floor.md)), and
 writes one `retrieval` audit row. The dense query is pinned to the stored `embedding_model` and runs with
 `hnsw.iterative_scan = relaxed_order`, so a reader permitted few chunks still gets `k` rows past the filter. `facts.py` reads structured
-numbers so the numeric path never asks a model for a figure; `calculator.py` is an AST-walked evaluator.
+numbers so the numeric path never asks a model for a figure; `calculator.py` is an abstract-syntax-tree-walked evaluator.
 
 `authz/` is the policy half: `cedar_local.py` and `verified_permissions.py` implement `Authorizer.decide`
 over the same `entities.py` mapping, fail closed on any error, and audit every decision. `group_cache.py`
-caches principal resolution in Redis with a TTL and resolves from Postgres on a miss or a Redis failure.
+caches principal resolution in Redis with a time to live (TTL) and resolves from Postgres on a miss or a Redis failure.
 `audit.py` is the single writer of `audit_events`.
 
-### L5 AI Harness (`harness/`)
+### L5 Artificial Intelligence (AI) Harness (`harness/`)
 
-`identity.py` turns a JWT into a `Principal`: signature, `exp` (required) and, for Cognito, issuer, audience
+`identity.py` turns a JSON Web Token (JWT) into a `Principal`: signature, `exp` (required) and, for Cognito, issuer, audience
 and `token_use` are verified; the user is `cognito:username` and the org the one `org:<slug>` group (locally
 `sub` and `org`). Groups and roles are then *resolved from the database*; the token's claims are a hint that
 never wins. `check_config()` refuses to boot `HR_MODE=aws` on local JWT settings. `registry.py` lists
-tools with their `ToolSpec` (JSON schema, risk level `read | write | money`, required roles, timeout,
-idempotency). `runner.run_tool` is the one door for a tool call from the agent or MCP: Cedar
+tools with their `ToolSpec` (JavaScript Object Notation (JSON) schema, risk level `read | write | money`, required roles, timeout,
+idempotency). `runner.run_tool` is the one door for a tool call from the agent or Model Context Protocol (MCP) server: Cedar
 `tool:<name>` on the caller's Org; then the risk gate (a `write` or `money` tool returns `approval_required`
 unless the caller passes `approved=True`, which only the graph does, after a human approved); then an
 idempotency reservation (`INSERT ... ON CONFLICT DO NOTHING RETURNING`; the key is
@@ -97,7 +97,7 @@ replayable, resumable after a human decision. Temporal orchestrates ingestion: m
 activities retried with backoff, a dead letter per filing. Neither is used for the other's job; a turn never
 waits on Temporal and an ingest never runs inside a graph node.
 
-**Deterministic by default.** Identity resolution, the Cedar decision, the SQL ACL filter, reciprocal rank
+**Deterministic by default.** Identity resolution, the Cedar decision, the Structured Query Language (SQL) ACL filter, reciprocal rank
 fusion, the facts table and the calculator, turn budgets, breakers and idempotency are all deterministic.
 Only the four model calls (understand, plan, generate, verify) are not, and each one sits between a
 deterministic gate before it (policy, `specs_for`, the ACL-filtered evidence) and after it (the Cedar check
@@ -109,7 +109,7 @@ what* or *what runs*.
 
 `api/app.py` is FastAPI: bearer auth on every route but `/healthz`, `/metrics` and the local-only
 `/auth/dev-token`; `/healthz` answers 503 when Postgres or Redis is down, and at startup `check_config()` and
-(in `aws` mode) the Postgres checkpointer fail fast, while in local mode the process stays up degraded; `/chat` and `/chat/{thread_id}/approve` stream `TurnEvent`s as SSE; `/threads/{id}/replay`
+(in `aws` mode) the Postgres checkpointer fail fast, while in local mode the process stays up degraded; `/chat` and `/chat/{thread_id}/approve` stream `TurnEvent`s as server-sent events (SSE); `/threads/{id}/replay`
 and `/documents` (which reuses the ACL predicate). `apps/web` is a Vite + React + TypeScript SPA with React Router,
 Tailwind and Zod validation of every payload: sign-in, chat with the event timeline and the approval card,
 replay, and the documents page that proves item-level permissions by listing what the signed-in identity may
@@ -119,7 +119,7 @@ as another seeded user in a second column; that is the demo's mechanism for show
     In production: one person, one Cognito sign-in; no persona switch.
     In this demo: switch among alice, bob and carol via `/auth/dev-token`, because the point is the same
     question under different permissions.
- It is a pure client over the SSE API, so nothing needs server rendering (it is not Next.js); the build is
+ It is a pure client over the application programming interface (API) that streams SSE, so nothing needs server rendering (it is not Next.js); the build is
 static `dist/` files on S3 behind CloudFront (nginx in Docker locally). `mcp_server/server.py` exposes the registry's tools to an MCP
 client for the principal in `HR_TOKEN`, every call through `run_tool`.
 
@@ -143,7 +143,7 @@ edit.
 | Purpose | Store | What lives there | Why this store |
 |---|---|---|---|
 | Authority | S3 (`S3_RAW_BUCKET`) or `data/edgar/`; EDGAR itself | The original filing bytes; `documents.uri` points back | Re-parse without re-download; the source system stays the truth |
-| Search | Postgres: `chunks` (HNSW on `embedding vector(512)`, GIN on `content_tsv`), `facts`, `documents`, `document_acl` | What retrieval ranks, with the ACL rows it filters on | One predicate in one engine ([ADR 0001](adr/0001-pgvector-over-opensearch.md)) |
+| Search | Postgres: `chunks` (HNSW on `embedding vector(512)`, Generalized Inverted Index (GIN) on `content_tsv`), `facts`, `documents`, `document_acl` | What retrieval ranks, with the ACL rows it filters on | One predicate in one engine ([ADR 0001](adr/0001-pgvector-over-opensearch.md)) |
 | Control | Postgres: `ingest_jobs`, `idempotency_keys`, `audit_events`, `eval_records`, LangGraph `checkpoints*`; `principals`, `group_members`, `orgs` | Job state, tool idempotency (rows are never expired), the audit trail, eval scores, thread checkpoints, the identity mirror | Transactional with the data it describes |
 | Acceleration | Redis / Valkey | `hr:principal:<org>:<user>` group and role resolution, TTL 300 s | A miss or an outage falls back to Postgres; a hit never grants more than the database would |
 

@@ -1,11 +1,11 @@
-# ADR 0005: 512-dimension embeddings on both backends
+# Architecture decision record (ADR) 0005: 512-dimension embeddings on both backends
 
 Status: accepted · 2026-11
 
 ## Context
 
-The local stack must embed with no network and no cost; AWS embeds with Titan Text Embeddings v2. The
-`chunks.embedding` column has one fixed dimension under one HNSW index; changing it means a re-embed and
+The local stack must embed with no network and no cost; Amazon Web Services (AWS) embeds with Titan Text Embeddings v2. The
+`chunks.embedding` column has one fixed dimension under one Hierarchical Navigable Small World (HNSW) index; changing it means a re-embed and
 a rebuild.
 
 ## Decision
@@ -27,5 +27,5 @@ returned length (`retrieval/embed.py`) and `chunks.embedding_model` records whic
 - One schema, one index, one query for both backends; a local test of the dense query is a real test.
 - Vectors from the two models are not comparable: an index embedded locally must be re-embedded when the
   backend switches to Titan (`embedding_model` says which rows need it).
-- No retrieval-quality figure is claimed for either model in this repository; measuring it on the EDGAR
+- No retrieval-quality figure is claimed for either model in this repository; measuring it on the Electronic Data Gathering, Analysis, and Retrieval system (EDGAR)
   corpus is the first thing a production tuning pass does.

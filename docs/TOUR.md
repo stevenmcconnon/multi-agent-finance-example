@@ -6,9 +6,9 @@ goes, and it lets the owner narrate the system by clicking through it.
 
 ## 1. Token -> Principal
 
-`services/harness_rag/api/app.py` `current_principal` reads the `Authorization: Bearer` header and calls
+`services/harness_rag/api/app.py` `current_principal` reads the `Authorization: Bearer` header (a JSON Web Token (JWT)) and calls
 `services/harness_rag/harness/identity.py` `verify_token`. `decode_claims` verifies the signature, `exp` (required) and,
-for Cognito, issuer, audience and `token_use` (HS256 dev secret locally, RS256 JWKS on AWS);
+for Cognito, issuer, audience and `token_use` (a shared-secret signature (HS256) with a dev secret locally; a public-key signature (RS256) checked against the JSON Web Key Set (JWKS) on Amazon Web Services (AWS));
 `identity_from_claims` takes `cognito:username` and the `org:<slug>` group there, `sub` and `org` locally. Then the important
 line: groups and roles come from `GroupCache.get(org_id, sub)`, which resolves from `principals` and
 `group_members` in Postgres (`authz/group_cache.py` `resolve_from_db`), cached in Redis for 300 seconds. The
@@ -34,7 +34,7 @@ Two places ask Cedar, both through the `Authorizer` port (`interfaces.py`):
 any error and audit every decision as `policy.decision`.
 
 What to notice: the per-document `document_acl_read` policy exists and is tested, but the hot path does not
-call Cedar once per chunk. Row-level filtering is the SQL predicate in the next stop; Cedar decides the
+call Cedar once per chunk. Row-level filtering is the Structured Query Language (SQL) predicate in the next stop; Cedar decides the
 coarse question and the tools.
 
 ## 3. The SQL predicate
@@ -49,12 +49,12 @@ only source of the parameters.
 constant over `chunks` or `facts` and asserts the predicate is present and precedes `LIMIT`. Add a fourth
 query without it and the build fails.
 
-## 4. Hybrid retrieval and RRF
+## 4. Hybrid retrieval and reciprocal rank fusion (RRF)
 
 `retrieval/hybrid.py` `PgHybridRetriever.retrieve`: embed the rewritten query (`Embedder.embed`), run
-`DENSE_SQL` (cosine over the HNSW index, pinned to the stored `embedding_model`, with
+`DENSE_SQL` (cosine over the Hierarchical Navigable Small World index (HNSW), pinned to the stored `embedding_model`, with
 `hnsw.iterative_scan = relaxed_order` set by `db.fetch`) and `SPARSE_SQL` (`websearch_to_tsquery` over the generated
-`tsvector`) with the same ACL parameters, then `rrf_fuse` the two id lists with k = 60. Everything fused was
+`tsvector`) with the same access control list (ACL) parameters, then `rrf_fuse` the two id lists with k = 60. Everything fused was
 already authorized; `acl_filtered=True` on the result is a statement about the SQL, not a flag anyone can
 set from data.
 
@@ -68,7 +68,7 @@ offers `BAAI/bge-reranker-base` locally, Cohere Rerank 3.5 through `bedrock-runt
 `NoopReranker` for a degraded mode. Documents are sent as text only and mapped back by index. The reranker
 receives candidates that passed the predicate and nothing else. Then the relevance floor: chunks scoring below
 `HR_RERANK_MIN_SCORE` are dropped, so readable-but-irrelevant evidence counts as absent and the turn abstains
-(this is why bob abstains on the Apple supply-chain question; [ADR 0009](adr/0009-rerank-relevance-floor.md)).
+(this is why bob abstains on the Apple supply-chain question; architecture decision record [ADR 0009](adr/0009-rerank-relevance-floor.md)).
 
 `retrieve` ends with `audit.record("retrieval", ...)`: query, counts, and the document and chunk ids of what
 was returned.
@@ -85,7 +85,7 @@ inside `asyncio.timeout`, Tenacity (three attempts on `TransientError`, `Timeout
 per-tool pybreaker; then `audit.record("tool.call", ...)`. `harness/budget.py` `TurnBudget.charge` is called
 by the graph around each tool and model call.
 
-`mcp_server/server.py` binds the same registry to an MCP server for the principal in `HR_TOKEN`; a Claude
+`mcp_server/server.py` binds the same registry to a Model Context Protocol (MCP) server for the principal in `HR_TOKEN`; a Claude
 Desktop call lands in the same `run_tool`, so a write tool answers `approval_required` there: only the graph passes `approved=True`.
 
 ## 7. Generate
@@ -101,7 +101,7 @@ evidence, the model is not called at all. `gateway/bedrock.py` picks Claude Sonn
 ## 8. Verify
 
 `verify` node: `ModelRole.verify` (Claude Haiku 4.5 on Bedrock) receives `ANSWER` and `EVIDENCE` and
-returns `{grounded, confidence, unsupported_claims}` as JSON, parsed by `extract_json` into a
+returns `{grounded, confidence, unsupported_claims}` as JavaScript Object Notation (JSON), parsed by `extract_json` into a
 `Verification`. An unparsable verifier is a failed verification. `after_verify`: grounded -> `answer`;
 otherwise regenerate once with the unsupported claims named in the system prompt, then `abstain`.
 `tests/test_agent.py::test_ungrounded_draft_is_regenerated_then_abstains` proves the loop and its ceiling.
@@ -113,7 +113,7 @@ id, title, uri, section, version, snippet) and `_finish` writes the `answer` aud
 citations, model, latency. `abstain` writes the same row with a reason (`policy_denied`, `out_of_scope`,
 `no_authorized_evidence`, `not_grounded`). `api/app.py` `_sse` streams every `TurnEvent` the nodes emitted.
 
-## 10. Checkpoint, replay, HITL
+## 10. Checkpoint, replay, human in the loop (HITL)
 
 Every node's return is a checkpoint written by the LangGraph saver: `AsyncPostgresSaver` on the control
 database (`graph.startup`), `MemorySaver` in tests. `replay` lists a thread's checkpoints oldest first with

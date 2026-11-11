@@ -1,4 +1,4 @@
-# ADR 0008: The model selects tools; the harness enforces
+# Architecture decision record (ADR) 0008: The model selects tools; the harness enforces
 
 Status: accepted · 2026-11
 
