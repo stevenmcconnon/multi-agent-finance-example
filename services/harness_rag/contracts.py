@@ -1,8 +1,8 @@
 """Shared typed contracts. Every layer imports from here; nobody redefines these.
 
 Layer map (see docs/ARCHITECTURE.md):
-  L7 apps/web            L6 agent/ (LangGraph)      L5 harness/ (tools, policy, retries, HITL)
-  L4 retrieval/ + authz/ L3 gateway/ (Bedrock/fake) L2 ingest/ (Temporal, EDGAR, parse, embed)
+  L7 apps/web            L6 agent/ (LangGraph)      L5 harness/ + authz/ (identity, policy, tools, retries, HITL)
+  L4 retrieval/          L3 gateway/ (Bedrock/fake) L2 ingest/ (Temporal, EDGAR, parse, embed)
   L1 infra/ (Terraform, OTel)
 """
 

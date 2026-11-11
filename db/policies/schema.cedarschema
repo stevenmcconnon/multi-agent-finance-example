@@ -59,14 +59,4 @@ namespace HarnessRag {
     resource: [Org],
     context: {}
   };
-  action "tool:send_report" in [WriteTools] appliesTo {
-    principal: [User],
-    resource: [Org],
-    context: {}
-  };
-  action "tool:transfer_funds" in [WriteTools] appliesTo {
-    principal: [User],
-    resource: [Org],
-    context: {}
-  };
 }

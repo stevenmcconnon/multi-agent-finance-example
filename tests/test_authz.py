@@ -85,7 +85,7 @@ async def test_write_tools_require_admin(authz):
     org = f"Org::{ORG}"
     assert (await authz.decide(ALICE, "tool:create_ticket", org)).allow is False
     assert (await authz.decide(CAROL, "tool:create_ticket", org)).allow is True
-    assert (await authz.decide(CAROL, "tool:transfer_funds", org)).allow is True
+    assert (await authz.decide(CAROL, "tool:create_ticket", org)).allow is True
 
 
 async def test_unknown_tool_fails_closed(authz):

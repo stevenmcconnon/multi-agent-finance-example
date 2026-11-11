@@ -1,16 +1,44 @@
 {
   "HarnessRag": {
     "entityTypes": {
-      "Org": { "shape": { "type": "Record", "attributes": { "org": { "type": "String" } } } },
+      "Org": {
+        "shape": {
+          "type": "Record",
+          "attributes": {
+            "org": {
+              "type": "String"
+            }
+          }
+        }
+      },
       "User": {
         "shape": {
           "type": "Record",
           "attributes": {
-            "org": { "type": "String" },
-            "uid": { "type": "String" },
-            "groups": { "type": "Set", "element": { "type": "String" } },
-            "roles": { "type": "Set", "element": { "type": "String" } },
-            "acl_ids": { "type": "Set", "element": { "type": "String" } }
+            "org": {
+              "type": "String"
+            },
+            "uid": {
+              "type": "String"
+            },
+            "groups": {
+              "type": "Set",
+              "element": {
+                "type": "String"
+              }
+            },
+            "roles": {
+              "type": "Set",
+              "element": {
+                "type": "String"
+              }
+            },
+            "acl_ids": {
+              "type": "Set",
+              "element": {
+                "type": "String"
+              }
+            }
           }
         }
       },
@@ -18,23 +46,123 @@
         "shape": {
           "type": "Record",
           "attributes": {
-            "org": { "type": "String" },
-            "readers": { "type": "Set", "element": { "type": "String" } }
+            "org": {
+              "type": "String"
+            },
+            "readers": {
+              "type": "Set",
+              "element": {
+                "type": "String"
+              }
+            }
           }
         }
       }
     },
     "actions": {
-      "retrieve": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Document", "Org"], "context": { "type": "Record", "attributes": {} } } },
-      "answer": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Document", "Org"], "context": { "type": "Record", "attributes": {} } } },
+      "retrieve": {
+        "appliesTo": {
+          "principalTypes": [
+            "User"
+          ],
+          "resourceTypes": [
+            "Document",
+            "Org"
+          ],
+          "context": {
+            "type": "Record",
+            "attributes": {}
+          }
+        }
+      },
+      "answer": {
+        "appliesTo": {
+          "principalTypes": [
+            "User"
+          ],
+          "resourceTypes": [
+            "Document",
+            "Org"
+          ],
+          "context": {
+            "type": "Record",
+            "attributes": {}
+          }
+        }
+      },
       "ReadTools": {},
       "WriteTools": {},
-      "tool:search_documents": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Org"], "context": { "type": "Record", "attributes": {} } } },
-      "tool:facts_sql": { "memberOf": [{ "id": "ReadTools" }], "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Org"], "context": { "type": "Record", "attributes": {} } } },
-      "tool:calculator": { "memberOf": [{ "id": "ReadTools" }], "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Org"], "context": { "type": "Record", "attributes": {} } } },
-      "tool:create_ticket": { "memberOf": [{ "id": "WriteTools" }], "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Org"], "context": { "type": "Record", "attributes": {} } } },
-      "tool:send_report": { "memberOf": [{ "id": "WriteTools" }], "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Org"], "context": { "type": "Record", "attributes": {} } } },
-      "tool:transfer_funds": { "memberOf": [{ "id": "WriteTools" }], "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Org"], "context": { "type": "Record", "attributes": {} } } }
+      "tool:search_documents": {
+        "appliesTo": {
+          "principalTypes": [
+            "User"
+          ],
+          "resourceTypes": [
+            "Org"
+          ],
+          "context": {
+            "type": "Record",
+            "attributes": {}
+          }
+        }
+      },
+      "tool:facts_sql": {
+        "memberOf": [
+          {
+            "id": "ReadTools"
+          }
+        ],
+        "appliesTo": {
+          "principalTypes": [
+            "User"
+          ],
+          "resourceTypes": [
+            "Org"
+          ],
+          "context": {
+            "type": "Record",
+            "attributes": {}
+          }
+        }
+      },
+      "tool:calculator": {
+        "memberOf": [
+          {
+            "id": "ReadTools"
+          }
+        ],
+        "appliesTo": {
+          "principalTypes": [
+            "User"
+          ],
+          "resourceTypes": [
+            "Org"
+          ],
+          "context": {
+            "type": "Record",
+            "attributes": {}
+          }
+        }
+      },
+      "tool:create_ticket": {
+        "memberOf": [
+          {
+            "id": "WriteTools"
+          }
+        ],
+        "appliesTo": {
+          "principalTypes": [
+            "User"
+          ],
+          "resourceTypes": [
+            "Org"
+          ],
+          "context": {
+            "type": "Record",
+            "attributes": {}
+          }
+        }
+      }
     }
   }
 }
