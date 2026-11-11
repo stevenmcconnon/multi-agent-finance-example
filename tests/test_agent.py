@@ -387,3 +387,40 @@ async def test_judge_uses_the_verify_role(wired, monkeypatch):
     assert [r for r, _ in roles] == [ModelRole.generate, ModelRole.verify]
     assert roles[0][1] == team.Writer.SYSTEM and roles[1][1] == team.Judge.SYSTEM
     assert team.Judge.kind == "model" and team.Writer.kind == "model"
+
+
+async def test_more_planned_calculations_than_budget_is_capped_not_an_error(wired, monkeypatch):
+    """A plan of 8 read tools plus the forced search is 9 > budget 8: act drops the last non-search call."""
+    monkeypatch.setattr(graph.settings, "hr_turn_tool_call_budget", 8)
+
+    async def eight(question, understood, tools, evidence_summary):
+        return [ToolCall(tool="calculator", arguments={"expression": f"{i}+1"}) for i in range(8)]
+
+    monkeypatch.setattr(wired["gateway"], "plan", eight)
+    events = [e async for e in stream_turn(ALICE, "What did AAPL say about net sales?", "t-cap-calc")]
+    assert not any(e.type == "error" for e in events)
+    tools = [e.data["tool"] for e in events if e.type == "tool"]
+    assert tools.count("calculator") == 7 and tools.count("search_documents") == 1
+    assert events[-1].type == "answer" and events[-1].data["abstained"] is False
+
+
+async def test_unreadable_verifier_output_fails_verification(wired, monkeypatch):
+    """The Judge never passes a draft it could not check: garbage from the verify model is grounded=False."""
+    gw = wired["gateway"]
+    real = gw.complete
+
+    async def garbage(role, system, messages, **kw):
+        text, usage = await real(role, system, messages, **kw)
+        return ("not json at all", usage) if role.value == "verify" else (text, usage)
+
+    monkeypatch.setattr(gw, "complete", garbage)
+    ans = await run_turn(ALICE, "What did AAPL say about net sales?", "t-garbage")
+    assert ans.abstained is True and ans.verification is not None and ans.verification.grounded is False
+    assert any("unreadable" in c for c in ans.verification.unsupported_claims)
+
+
+async def test_token_budget_exceeded_ends_the_stream_with_an_error_event(wired, monkeypatch):
+    monkeypatch.setattr(graph.settings, "hr_turn_token_budget", 1)
+    events = [e async for e in stream_turn(ALICE, "What did AAPL say about net sales?", "t-tokens")]
+    assert events[-1].type == "error" and events[-1].data["code"] == "budget_exceeded"
+    assert not any(e.type == "answer" for e in events)

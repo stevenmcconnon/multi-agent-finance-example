@@ -65,14 +65,6 @@ class PgHybridRetriever:
 
         return await db.fetch(query, params, iterative_scan=dense)
 
-    @staticmethod
-    def dense_query() -> str:
-        return sql.DENSE_SQL
-
-    @staticmethod
-    def sparse_query() -> str:
-        return sql.SPARSE_SQL
-
     async def retrieve(self, req: RetrievalRequest) -> RetrievalResult:
         started = time.perf_counter()
         base = sql.acl_params(req.principal)

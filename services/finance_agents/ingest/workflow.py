@@ -92,7 +92,10 @@ async def discover(org_id: str, tickers: list[str], forms: list[str], limit: int
     ciks = await edgar.ticker_to_cik()
     out: list[dict[str, Any]] = []
     for ticker in tickers:
-        cik = ciks[ticker.upper()]
+        cik = ciks.get(ticker.upper())
+        if cik is None:  # a typo must not fail (and retry) the whole batch
+            log.warning("ingest.unknown_ticker", ticker=ticker)
+            continue
         picked = [f for f in await edgar.submissions(cik) if f["form"] in forms and f["primaryDocument"]][:limit]
         out.extend(message(org_id, cik, ticker.upper(), f) for f in picked)
     log.info("ingest.discovered", count=len(out), tickers=tickers, forms=forms)

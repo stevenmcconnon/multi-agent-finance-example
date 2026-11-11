@@ -51,7 +51,7 @@ from ..harness.budget import BudgetExceeded, TurnBudget
 from ..harness.registry import ToolRegistry
 from ..harness.tools import default_registry
 from ..interfaces import ModelGateway
-from .team import Approver, Guard, Judge, Planner, Researcher, Writer, status
+from .team import Approver, Guard, Judge, Planner, Researcher, Writer, principal_of, status
 from .team import ev as _ev
 from .team import evidence as _evidence
 
@@ -172,10 +172,6 @@ def _graph() -> Any:
 
 
 # ---------- helpers ----------
-def _principal(state: TurnState) -> Principal:
-    return Principal(**state["principal"])
-
-
 def _model_name() -> str:
     gw = _gw()
     return getattr(gw, "model_name", None) or str(getattr(gw, "models", {}).get(ModelRole.generate, type(gw).__name__))
@@ -185,7 +181,7 @@ async def _finish(state: TurnState, ans: Answer, node: str, **extra: Any) -> dic
     payload = ans.model_dump(mode="json")
     await audit.record(
         "answer",
-        _principal(state),
+        principal_of(state),
         {
             "abstained": ans.abstained,
             "citations": payload["citations"],

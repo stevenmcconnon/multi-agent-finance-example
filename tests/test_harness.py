@@ -186,3 +186,20 @@ async def test_failed_idempotent_run_releases_its_key():
     call = ToolCall(tool="calculator", arguments={}, idempotency_key="k")
     assert (await run_tool(ALICE, call, "t1", reg)).ok is False
     assert (await run_tool(ALICE, call, "t1", reg)).ok is True and tool.calls == 2
+
+
+async def test_hung_tool_times_out_is_retried_and_reported():
+    class _Hung:
+        spec = ToolSpec(
+            name="calculator", description="hangs", input_schema={}, required_roles=["analyst"], timeout_seconds=0.02
+        )
+        calls = 0
+
+        async def run(self, principal, call):
+            self.calls += 1
+            await asyncio.sleep(1)
+            return ToolResult(tool="calculator", ok=True)
+
+    tool = _Hung()
+    res = await run_tool(ALICE, ToolCall(tool="calculator", arguments={}), "t1", ToolRegistry([tool]))
+    assert res.ok is False and res.error.startswith("TimeoutError") and tool.calls == 3

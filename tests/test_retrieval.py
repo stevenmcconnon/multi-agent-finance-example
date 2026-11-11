@@ -32,7 +32,7 @@ def capture_audit(monkeypatch):
 
 # ---- SQL builder: the ACL predicate is in every candidate query, before any ranking ----
 def test_acl_predicate_in_dense_and_sparse_and_facts():
-    for q in (PgHybridRetriever.dense_query(), PgHybridRetriever.sparse_query(), PgFactStore.facts_query()):
+    for q in (sql.DENSE_SQL, sql.SPARSE_SQL, sql.FACTS_SQL):
         assert sql.ACL_PREDICATE in q
         assert "c.org_id = %(org)s" in q
         assert "d.deleted_at IS NULL" in q
@@ -123,10 +123,17 @@ def test_calculator_arithmetic():
     assert evaluate("-3.5 + +1") == -2.5
 
 
-@pytest.mark.parametrize("expr", ["__import__('os')", "a + 1", "1 if 1 else 2", "max(1,2)", "2 ** 5000", "1/0", ""])
+@pytest.mark.parametrize(
+    "expr",
+    ["__import__('os')", "a + 1", "1 if 1 else 2", "max(1,2)", "2 ** 5000", "((9**1000)**1000)**1000", "1/0", ""],
+)
 def test_calculator_rejects(expr):
+    import time
+
+    started = time.perf_counter()
     with pytest.raises(CalculatorError):
         evaluate(expr)
+    assert time.perf_counter() - started < 1  # a chained power overflows at once; it never builds the bigint
 
 
 # ---- DB-backed: skipped unless DATABASE_URL answers ----
@@ -247,8 +254,6 @@ async def test_rerank_floor_drops_irrelevant_authorized_chunks(monkeypatch):
 
 
 async def test_fact_query_expands_revenue_aliases_and_carries_document_provenance():
-    from finance_agents.retrieval.facts import PgFactStore
-
     seen: dict = {}
 
     async def fetch(sql_text, params, **_):

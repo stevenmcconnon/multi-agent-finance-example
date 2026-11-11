@@ -138,6 +138,30 @@ def test_facts_keep_only_this_filing_and_parse_units_periods():
     assert all(r["entity"] == "AAPL" and r["provenance"]["accn"] == MSG["source_id"] for r in rows)
 
 
+# ---- discover: a typo in one ticker must not fail the batch ----
+async def test_discover_skips_an_unknown_ticker(monkeypatch):
+    from finance_agents.ingest import edgar, workflow
+
+    async def ciks():
+        return {"AAPL": 320193}
+
+    async def submissions(cik):
+        return [
+            {
+                "form": "10-K",
+                "accessionNumber": "0000320193-24-000123",
+                "primaryDocument": "aapl.htm",
+                "filingDate": "2024-11-01",
+                "reportDate": "2024-09-28",
+            }
+        ]
+
+    monkeypatch.setattr(edgar, "ticker_to_cik", ciks)
+    monkeypatch.setattr(edgar, "submissions", submissions)
+    msgs = await workflow.discover(MSG["org_id"], ["NOPE", "aapl"], ["10-K"], 2)
+    assert [m["ticker"] for m in msgs] == ["AAPL"] and msgs[0]["cik"] == 320193
+
+
 # ---- acl mapping ----
 def test_acl_groups_follow_contracts():
     assert groups_for("8-K") == ("engineering", "finance", "analysts")

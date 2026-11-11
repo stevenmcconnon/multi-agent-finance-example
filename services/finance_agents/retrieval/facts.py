@@ -23,10 +23,6 @@ class PgFactStore:
         self._fetch = fetch
         self._limit = limit
 
-    @staticmethod
-    def facts_query() -> str:
-        return sql.FACTS_SQL
-
     async def _run(self, query: str, params: dict[str, Any]) -> list[dict[str, Any]]:
         if self._fetch is not None:
             return await self._fetch(query, params)

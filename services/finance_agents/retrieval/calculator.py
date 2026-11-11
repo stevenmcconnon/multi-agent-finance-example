@@ -1,7 +1,7 @@
 """Safe arithmetic for the numeric path: numbers, + - * / % **, unary +/-, parentheses. Nothing else.
 
-AST-walked, no eval(), no names, no calls, no attribute access. Exponents are capped so
-"9**9**9" cannot pin a CPU.
+AST-walked, no eval(), no names, no calls, no attribute access. Exponents are capped and every value is a
+float, so "9**9**9" and "((9**1000)**1000)**1000" overflow at once instead of pinning a CPU on a bigint.
 """
 
 from __future__ import annotations
@@ -37,14 +37,17 @@ def evaluate(expression: str) -> float:
         tree = ast.parse(expression.strip(), mode="eval")
     except SyntaxError as exc:
         raise CalculatorError(f"invalid expression: {exc.msg}") from None
-    return float(_eval(tree.body))
+    try:
+        return _eval(tree.body)
+    except OverflowError:
+        raise CalculatorError("result too large") from None
 
 
 def _eval(node: ast.AST) -> float:
     if isinstance(node, ast.Constant):
         if isinstance(node.value, bool) or not isinstance(node.value, (int, float)):
             raise CalculatorError("only numbers are allowed")
-        return node.value
+        return float(node.value)
     if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY:
         return _UNARY[type(node.op)](_eval(node.operand))
     if isinstance(node, ast.BinOp) and type(node.op) in _BINARY:

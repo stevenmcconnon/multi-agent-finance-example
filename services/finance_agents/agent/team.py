@@ -176,11 +176,11 @@ class Researcher:
 
     @staticmethod
     def _fit(calls: list[ToolCall], remaining: int) -> list[ToolCall]:
-        """Drop trailing facts_sql calls until the turn's tool-call budget holds them all; the search always stays."""
+        """Drop trailing calls until the turn's tool-call budget holds them all; the search always stays."""
         drop = max(len(calls) - remaining, 0)
         kept: list[ToolCall] = []
         for c in reversed(calls):
-            if drop and c.tool == "facts_sql":
+            if drop and c.tool != "search_documents":
                 drop -= 1
                 continue
             kept.append(c)

@@ -22,8 +22,8 @@ __all__ = [
 ]
 
 
-def get_retriever(embed_backend: str | None = None, rerank_backend: str | None = None) -> Retriever:
-    return PgHybridRetriever(get_embedder(embed_backend), get_reranker(rerank_backend))
+def get_retriever() -> Retriever:
+    return PgHybridRetriever(get_embedder(), get_reranker())
 
 
 def get_fact_store() -> FactStore:
