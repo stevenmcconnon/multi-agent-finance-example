@@ -44,6 +44,7 @@ export const Answer = z.object({
   citations: z.array(Citation),
   confidence: z.number().min(0).max(1),
   abstained: z.boolean().default(false),
+  reason: z.string().nullable().optional(), // absent on an API older than the 2026-11-11 contract
   verification: Verification.nullable().optional(),
   thread_id: z.string(),
   trace_id: z.string().nullable().optional(),
@@ -110,6 +111,10 @@ export const Document = z.object({
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 export type Document = z.infer<typeof Document>;
+
+// GET /config: which model backend is running, so the offline stub is never mistaken for a language model.
+export const Config = z.object({ model_backend: z.string(), models: z.record(z.string(), z.string()).default({}) });
+export type Config = z.infer<typeof Config>;
 
 export const TokenResponse = z.object({ token: z.string() });
 

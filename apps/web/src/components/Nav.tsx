@@ -1,11 +1,13 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { AUTH_MODE, PERSONAS, clearToken, errorMessage, getMe, getToken, switchPersona } from "@/lib/api";
-import type { Principal } from "@/lib/schemas";
+import { AUTH_MODE, PERSONAS, clearToken, errorMessage, getConfig, getMe, getToken, switchPersona } from "@/lib/api";
+import { SESSION_EXPIRED, modelName } from "@/lib/present";
+import type { Config, Principal } from "@/lib/schemas";
 
 export default function Nav() {
   const [me, setMe] = useState<Principal | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
+  const [config, setConfig] = useState<Config | null>(null);
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
@@ -15,11 +17,22 @@ export default function Nav() {
 
   useEffect(() => {
     const refresh = () => getMe().then(setMe, () => setMe(null));
+    // any 401 (lib/api.ts already dropped the token): back to sign-in, saying why
+    const expired = () => {
+      setMe(null);
+      navigate("/", { replace: true, state: { notice: SESSION_EXPIRED } });
+    };
     window.addEventListener("hr-persona", refresh);
-    return () => window.removeEventListener("hr-persona", refresh);
-  }, []);
+    window.addEventListener("hr-expired", expired);
+    getConfig().then(setConfig);
+    return () => {
+      window.removeEventListener("hr-persona", refresh);
+      window.removeEventListener("hr-expired", expired);
+    };
+  }, [navigate]);
 
   const switchTo = async (user: (typeof PERSONAS)[number]["user"]) => {
+    setSwitchError(null);
     try {
       await switchPersona(user);
     } catch (e) {
@@ -48,7 +61,7 @@ export default function Nav() {
     <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2 px-4 py-2 text-sm">
         <Link to="/" className="mr-2 font-semibold tracking-tight">
-          Multi-Agent Finance
+          Multi-Agent RAG Finance Assistant
         </Link>
         {me && link("/chat", "Chat")}
         {me && link("/documents", "Documents")}
@@ -76,15 +89,33 @@ export default function Nav() {
                   aria-label="Switch persona"
                   value={me.user_id}
                   onChange={(e) => switchTo(e.target.value as (typeof PERSONAS)[number]["user"])}
-                  className="rounded border border-neutral-300 bg-white px-1 py-0.5 text-xs dark:border-neutral-700 dark:bg-neutral-900"
+                  className="max-w-44 truncate rounded border border-neutral-300 bg-white px-1 py-0.5 text-xs dark:border-neutral-700 dark:bg-neutral-900"
                 >
                   {PERSONAS.map((p) => (
                     <option key={p.user} value={p.user}>
-                      {p.user} ({p.role})
+                      {p.user} ({p.role}: {p.desc})
                     </option>
                   ))}
                 </select>
               )}
+              {config &&
+                // In production: Planner, Writer and Judge call Claude on Amazon Bedrock.
+                // In this demo: a deterministic stand-in by default, because the local stack runs without cloud credentials.
+                (config.model_backend === "bedrock" ? (
+                  <span
+                    title={`Generate: ${modelName(config.models.generate ?? "")}. Verify: ${modelName(config.models.verify ?? "")}.`}
+                    className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800 dark:bg-violet-900/60 dark:text-violet-200"
+                  >
+                    Models: Claude on Amazon Bedrock
+                  </span>
+                ) : (
+                  <span
+                    title="No language model is called in this local mode. Planner, Writer and Judge steps run a deterministic stand-in so the whole control flow works without cloud credentials. Start the stack with `make up-bedrock` to use Claude."
+                    className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                  >
+                    Models: offline stub
+                  </span>
+                ))}
               {switchError && <span className="text-xs text-red-700 dark:text-red-300">{switchError}</span>}
               <button onClick={signOut} className="underline hover:text-neutral-900 dark:hover:text-white">
                 Sign out

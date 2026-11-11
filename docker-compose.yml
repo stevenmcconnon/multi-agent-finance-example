@@ -1,4 +1,4 @@
-# Local stack, $0. `make up` → API :8000, web :3000, Temporal UI :8233, Phoenix :6006.
+# Local stack, $0. `make up` → API :8000 (API_PORT), web :3000 (WEB_PORT), Temporal UI :8233, Phoenix :6006.
 # One root `.env` (copy .env.example) feeds api and ingest-worker; compose overrides the
 # hostnames below so the same file also works for `uv run` on the host.
 x-app: &app
@@ -8,12 +8,15 @@ x-app: &app
   env_file:
     - path: .env
       required: false   # config.py defaults cover a fresh clone
-  environment:
+  environment: &app-env
     DATABASE_URL: postgresql://harness:harness@postgres:5432/harness
     REDIS_URL: redis://valkey:6379/0
     TEMPORAL_ADDRESS: temporal:7233
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
+    # The index is built with the local embedding model, so retrieval stays local in every compose mode.
+    HR_EMBED_BACKEND: fastembed
+    HR_RERANK_BACKEND: fastembed
   volumes:
     - fastembed-cache:/home/app/.cache/fastembed
 
@@ -64,7 +67,24 @@ services:
   api:
     <<: *app
     command: ["sh", "-c", "python -m finance_agents.ingest.cli migrate && uvicorn finance_agents.api.app:app --host 0.0.0.0 --port 8000"]
-    ports: ["8000:8000"]
+    # In production: the task role supplies AWS credentials and every model call goes to Amazon Bedrock.
+    # In this demo: the offline stub answers unless you run `make up-bedrock`, because real Claude calls
+    #   need an AWS account and cost money per question. A key with no value is passed through from the
+    #   host only when it is set there, so a plain `make up` is unchanged.
+    environment:
+      <<: *app-env
+      HR_MODEL_BACKEND:
+      AWS_REGION:
+      AWS_PROFILE:
+      AWS_ACCESS_KEY_ID:
+      AWS_SECRET_ACCESS_KEY:
+      AWS_SESSION_TOKEN:
+      BEDROCK_GENERATION_MODEL:
+      BEDROCK_VERIFIER_MODEL:
+    volumes:
+      - fastembed-cache:/home/app/.cache/fastembed
+      - ${HOME}/.aws:/home/app/.aws:ro   # so a named AWS_PROFILE works
+    ports: ["${API_PORT:-8000}:8000"]
     depends_on:
       postgres: { condition: service_healthy }
       valkey: { condition: service_started }
@@ -83,7 +103,7 @@ services:
     build:
       context: apps/web
       args:
-        VITE_API_URL: http://localhost:8000
+        VITE_API_URL: http://localhost:${API_PORT:-8000}
         VITE_AUTH_MODE: local
     ports: ["${WEB_PORT:-3000}:3000"]
     depends_on: [api]

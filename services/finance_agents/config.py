@@ -21,8 +21,9 @@ class Settings(BaseSettings):
 
     hr_model_backend: str = "fake"
     aws_region: str = "us-east-1"
-    bedrock_generation_model: str = "anthropic.claude-sonnet-4-5-20250929-v1:0"
-    bedrock_verifier_model: str = "anthropic.claude-haiku-4-5-20251001-v1:0"
+    # Inference profile ids: the bare model ids cannot be invoked on demand.
+    bedrock_generation_model: str = "us.anthropic.claude-sonnet-5-5"
+    bedrock_verifier_model: str = "us.anthropic.claude-haiku-5-5"
     bedrock_embedding_model: str = "amazon.titan-embed-text-v2:0"
     bedrock_rerank_model: str = "cohere.rerank-v3-5:0"
     hr_embed_backend: str = "fastembed"

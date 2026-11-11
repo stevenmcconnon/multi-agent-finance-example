@@ -8,17 +8,21 @@ The team (docs/CONTRACTS.md "The agent team"):
   policy      Guard      (deterministic)  Cedar: may this principal get an answer at all; deny -> abstain
   plan        Planner    (model)          picks tools (gateway.plan, Bedrock Converse tool use) from
                                           `registry.specs_for(principal)`, so it only ever sees tools this
-                                          principal's roles may use; capped at the turn's tool-call budget
+                                          principal's roles may use; capped at the turn's tool-call budget.
+                                          An action request for a write tool NOT on that menu is planned here
+                                          without the model, so the door refuses it (Cedar, audited)
   act         Researcher (deterministic)  every planned call goes through `harness.runner.run_tool` (Cedar,
-                                          idempotency, breaker, audit) in order; search_documents/facts_sql
-                                          results become the evidence; a lookup the model planned nothing for
-                                          still gets one search_documents
-              Approver   (human)          a write/money call first suspends the turn with interrupt(), resumed
-                                          by approve(); denied calls are skipped with a `tool` event ok=False
-                                          error="denied"
+                                          idempotency, breaker, audit); facts_sql/search_documents results
+                                          become the evidence. A figure is answered from facts (the search is
+                                          the fallback when none come back); two periods of one concept get
+                                          their change from the calculator tool
+              Approver   (human)          a write/money call on the caller's menu first suspends the turn with
+                                          interrupt(), resumed by approve(); denied calls are skipped with a
+                                          `tool` event ok=False error="denied"
   generate    Writer     (model)          answer from the evidence only; no evidence -> the model is never called
   verify      Judge      (model)          second model pass; ungrounded -> one regeneration, then abstain
-  answer | abstain       (supervisor)     cited Answer | abstain: ABSTAIN_TEXT with the reason audited
+  answer | abstain       (supervisor)     cited Answer | abstain. Every Answer carries `reason` and a sentence
+                                          a person can read for it (ABSTAIN_MESSAGES); the reason is audited
 
 Everything the model sees came back from `run_tool`. Models are reached through gateway/, Postgres only
 through the checkpointer; nothing here imports a vendor SDK. Entry points (run_turn, stream_turn, approve,
@@ -26,7 +30,7 @@ replay) are pinned in docs/CONTRACTS.md.
 
 In production: AsyncPostgresSaver on the control-plane database; Bedrock proposes the tool calls.
 In this demo: the same saver (MemorySaver injectable for offline tests); with HR_MODEL_BACKEND=fake the
-plan is a deterministic heuristic (gateway/fake.py `plan_heuristic`), because the fake model is offline.
+plan is a deterministic heuristic (gateway/fake.py `plan_heuristic`), because the offline stub is not a model.
 """
 
 from __future__ import annotations
@@ -45,12 +49,12 @@ from langgraph.types import Command
 
 from ..authz import audit
 from ..config import settings
-from ..contracts import Answer, ModelRole, Principal, TurnEvent, Verification
-from ..gateway import ABSTAIN_TEXT, get_gateway
+from ..contracts import Answer, AnswerReason, ModelRole, Principal, TurnEvent, Verification
+from ..gateway import ABSTAIN_TEXT, get_gateway, take_notes
 from ..harness.budget import BudgetExceeded, TurnBudget
 from ..harness.registry import ToolRegistry
 from ..harness.tools import default_registry
-from ..interfaces import ModelGateway
+from ..interfaces import ModelGateway, ModelRefused
 from .team import Approver, Guard, Judge, Planner, Researcher, Writer, principal_of, status
 from .team import ev as _ev
 from .team import evidence as _evidence
@@ -59,6 +63,16 @@ log = logging.getLogger(__name__)
 
 MAX_GENERATE_ATTEMPTS = 2
 _CITE = re.compile(r"\[(\d+)\]")
+# What the reader is told when the turn does not answer, per Answer.reason (docs/CONTRACTS.md).
+ABSTAIN_MESSAGES = {
+    "no_relevant_evidence": "None of the documents you are allowed to read answer that question.",
+    "out_of_scope": (
+        "That is not a question about the filings. Ask about a company's reports, or try one of the examples."
+    ),
+    "not_grounded": "A draft answer was written but failed verification against the evidence, so it was withheld.",
+    "policy_denied": "Your account is not permitted to ask questions here.",
+    "model_declined": "The model declined to answer this request.",
+}
 
 
 class TurnState(TypedDict, total=False):
@@ -75,6 +89,8 @@ class TurnState(TypedDict, total=False):
     verification: dict[str, Any]
     answer: dict[str, Any] | None
     planned_tools: list[dict[str, Any]]  # ToolCall.model_dump(); the model's picks, capped by the budget
+    offered: list[str]  # the tool names on this principal's menu at plan time
+    declined: bool  # the model refused (gateway raised ModelRefused)
     attempts: int
     budget: dict[str, Any]  # dataclasses.asdict(TurnBudget)
     events: list[dict[str, Any]]  # this node's TurnEvents; read from `updates` stream mode
@@ -172,6 +188,12 @@ def _graph() -> Any:
 
 
 # ---------- helpers ----------
+def _notes() -> str:
+    """Anything the gateway did instead of the model call this node asked for (a deterministic fallback after
+    a model error), appended to the node's status message so the screen never claims a step that did not happen."""
+    return "".join(f"; {n}" for n in take_notes())
+
+
 def _model_name() -> str:
     gw = _gw()
     return getattr(gw, "model_name", None) or str(getattr(gw, "models", {}).get(ModelRole.generate, type(gw).__name__))
@@ -188,6 +210,7 @@ async def _finish(state: TurnState, ans: Answer, node: str, **extra: Any) -> dic
             "model": _model_name(),
             "grounded": ans.verification.grounded if ans.verification else None,
             "latency_ms": int((time.time() - state["started"]) * 1000),
+            "reason": ans.reason,
             **extra,
         },
         state["thread_id"],
@@ -199,10 +222,11 @@ async def _finish(state: TurnState, ans: Answer, node: str, **extra: Any) -> dic
 async def understand(state: TurnState) -> dict[str, Any]:
     planner = Planner(_gw(), _reg())
     q = await planner.understand(state["question"])
+    message = f"intent={q.intent.value} entities={q.entities}" + _notes()
     return {
         "node": "understand",
         "understood": q.model_dump(mode="json"),
-        "events": [status(planner, "understand", f"intent={q.intent.value} entities={q.entities}")],
+        "events": [status(planner, "understand", message)],
     }
 
 
@@ -212,7 +236,7 @@ async def policy(state: TurnState) -> dict[str, Any]:
     return {
         "node": "policy",
         "policy": dumped,
-        "events": [_ev("policy", **dumped), status(guard, "policy", f"allow={dumped['allow']}")],
+        "events": [_ev("policy", **dumped)],  # the one Guard row; a status event would say the same thing twice
     }
 
 
@@ -223,15 +247,30 @@ def route(state: TurnState) -> str:
 async def plan(state: TurnState) -> dict[str, Any]:
     planner = Planner(_gw(), _reg())
     calls, offered = await planner.plan(state)
+    events = [status(planner, "plan", f"offered={offered} planned={[c.tool for c in calls]}" + _notes())]
+    if state["understood"]["intent"] == "action" and (
+        refused := Researcher(_reg(), Approver()).door_calls(state["question"], offered)
+    ):
+        # The door refuses, never the menu: the request still reaches run_tool, whose Cedar check says no.
+        calls = refused
+        roles = principal_of(state).roles
+        events.append(
+            status(
+                Guard(),
+                "plan",
+                f"{[c.tool for c in calls]} not offered to roles {roles}; sent to the policy door to be decided",
+            )
+        )
     return {
         "node": "plan",
         "planned_tools": [c.model_dump(mode="json") for c in calls],
-        "events": [status(planner, "plan", f"offered={offered} planned={[c.tool for c in calls]}")],
+        "offered": offered,
+        "events": events,
     }
 
 
 def after_plan(state: TurnState) -> str:
-    if not state["planned_tools"] and state["understood"]["intent"] == "out_of_scope":
+    if not state["planned_tools"] and state["understood"]["intent"] in ("out_of_scope", "action"):
         return "abstain"
     return "act"
 
@@ -240,12 +279,14 @@ async def act(state: TurnState) -> dict[str, Any]:
     out, outcomes = await Researcher(_reg(), Approver()).research(state)
     if outcomes and not _evidence({**state, "chunks": out["chunks"], "facts": out["facts"]}):
         # A pure action turn: the write outcome IS the answer; there is nothing for the model to ground.
-        ok = all(k for _, k in outcomes)
+        reason: AnswerReason = next((r for _, r in outcomes if r != "action_done"), "action_done")
+        ok = reason == "action_done"
         ans = Answer(
             text=" ".join(t for t, _ in outcomes),
             citations=[],
             confidence=1.0 if ok else 0.0,
             abstained=not ok,
+            reason=reason,
             thread_id=state["thread_id"],
         )
         ran = [e["data"]["tool"] for e in out["events"] if e["type"] == "tool"]
@@ -265,9 +306,17 @@ async def generate(state: TurnState) -> dict[str, Any]:
         return {
             "node": "generate",
             "draft": "",
-            "events": [status(writer, "generate", "no authorized evidence; abstaining")],
+            "events": [status(writer, "generate", "no evidence this reader may see; the model was not called")],
         }
-    text, tokens = await writer.draft(state, items)
+    try:
+        text, tokens = await writer.draft(state, items)
+    except ModelRefused as exc:
+        return {
+            "node": "generate",
+            "draft": "",
+            "declined": True,
+            "events": [status(writer, "generate", f"model declined: {exc}")],
+        }
     budget = TurnBudget(**state["budget"])
     budget.charge(tokens=tokens)
     return {
@@ -288,7 +337,10 @@ def after_generate(state: TurnState) -> str:
 
 async def verify(state: TurnState) -> dict[str, Any]:
     judge = Judge(_gw())
-    v, tokens = await judge.verify(state, _evidence(state))
+    try:
+        v, tokens = await judge.verify(state, _evidence(state))
+    except ModelRefused as exc:
+        return {"node": "verify", "declined": True, "events": [status(judge, "verify", f"model declined: {exc}")]}
     budget = TurnBudget(**state["budget"])
     budget.charge(tokens=tokens)
     return {
@@ -300,6 +352,8 @@ async def verify(state: TurnState) -> dict[str, Any]:
 
 
 def after_verify(state: TurnState) -> str:
+    if state.get("declined"):
+        return "abstain"
     if state["verification"]["grounded"]:
         return "answer"
     return "generate" if state["attempts"] < MAX_GENERATE_ATTEMPTS else "abstain"
@@ -314,6 +368,7 @@ async def answer(state: TurnState) -> dict[str, Any]:
         text=state["draft"],
         citations=citations,
         confidence=v.confidence,
+        reason="answered",
         verification=v,
         thread_id=state["thread_id"],
     )
@@ -321,24 +376,28 @@ async def answer(state: TurnState) -> dict[str, Any]:
 
 
 async def abstain(state: TurnState) -> dict[str, Any]:
+    reason: AnswerReason
     if not state["policy"]["allow"]:
         reason = "policy_denied"
-    elif state["understood"]["intent"] == "out_of_scope":
+    elif state["understood"]["intent"] in ("out_of_scope", "action"):  # action: nothing this assistant can do
         reason = "out_of_scope"
-    elif not _evidence(state):
-        reason = "no_authorized_evidence"
+    elif state.get("declined"):
+        reason = "model_declined"
+    elif not _evidence(state) or state["draft"] in ("", ABSTAIN_TEXT):  # nothing readable, or the Writer's sentinel
+        reason = "no_relevant_evidence"
     else:
         reason = "not_grounded"
     v = Verification(**state["verification"]) if state.get("verification") else None
     ans = Answer(
-        text=ABSTAIN_TEXT,
+        text=ABSTAIN_MESSAGES[reason],
         citations=[],
         confidence=0.0,
         abstained=True,
+        reason=reason,
         verification=v,
         thread_id=state["thread_id"],
     )
-    return await _finish(state, ans, "abstain", reason=reason)
+    return await _finish(state, ans, "abstain")
 
 
 # ---------- entry points (docs/CONTRACTS.md) ----------
@@ -356,6 +415,8 @@ def _initial(principal: Principal, question: str, thread_id: str) -> TurnState:
         "draft": "",
         "answer": None,
         "planned_tools": [],
+        "offered": [],
+        "declined": False,
         "attempts": 0,
         "budget": asdict(TurnBudget()),
         "events": [],
@@ -409,6 +470,7 @@ async def run_turn(principal: Principal, question: str, thread_id: str) -> Answe
         citations=[],
         confidence=0.0,
         abstained=True,
+        reason="approval_pending",
         thread_id=thread_id,
     )
 

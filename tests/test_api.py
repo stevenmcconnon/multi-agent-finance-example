@@ -32,7 +32,7 @@ CHUNK = Chunk(
     ordinal=0,
     title="AAPL 10-K",
     uri="https://sec.gov/x",
-    content="Revenue grew 8 percent in fiscal 2023.",
+    content="Revenue grew 8 percent in fiscal 2023 on higher services sales.",
 )
 
 
@@ -104,6 +104,37 @@ def test_chat_streams_to_an_answer(client):
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
     events = _events(r.text)
     assert events[0] == "guardrail" and events[1] == "status" and events[-1] == "answer"
+    assert _data(r.text, "answer")[0]["reason"] == "answered"
+    assert _data(r.text, "guardrail")[-1] == {"stage": "output", "redactions": [], "uncited": False}
+
+
+def test_config_names_the_offline_stub_without_auth(client):
+    r = client.get("/config")
+    assert r.status_code == 200 and r.json() == {
+        "model_backend": "fake",
+        "models": {
+            "generate": "offline-stub",
+            "verify": "offline-stub",
+            "embed": "jinaai/jina-embeddings-v2-small-en",
+            "rerank": "BAAI/bge-reranker-base",
+        },
+        "auth_mode": "local",
+    }
+
+
+def test_refused_action_and_abstention_are_not_flagged_uncited(client):
+    """Alice may not create tickets: the answer says so, with its reason, and the output guardrail stays quiet."""
+    r = client.post(
+        "/chat", json={"question": "Create a ticket to review Apple's 10-K risk section"}, headers=_auth("alice")
+    )
+    (answer,) = _data(r.text, "answer")
+    assert answer["reason"] == "action_forbidden" and answer["text"] == (
+        "Your role (analyst) may not create tickets; that needs the admin role. Nothing was changed."
+    )
+    assert any(t["tool"] == "create_ticket" and t["error"] == "forbidden" for t in _data(r.text, "tool"))
+    assert _data(r.text, "guardrail")[-1]["uncited"] is False
+    r = client.post("/chat", json={"question": "hello there"}, headers=_auth("alice"))
+    assert _data(r.text, "answer")[0]["reason"] == "out_of_scope" and _data(r.text, "guardrail")[-1]["uncited"] is False
 
 
 def test_approve_on_a_foreign_thread_is_403(client):

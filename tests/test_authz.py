@@ -135,7 +135,7 @@ async def test_avp_allow_and_entity_shape():
     assert d.allow is True and d.policy_ids == ["p1"]
     call = fake.calls[0]
     assert call["policyStoreId"] == "store-1"
-    assert call["principal"] == {"entityType": "HarnessRag::User", "entityId": "alice"}
+    assert call["principal"] == {"entityType": "FinanceAgents::User", "entityId": "alice"}
     user_entity = call["entities"]["entityList"][0]
     assert {"string": "group:finance"} in user_entity["attributes"]["acl_ids"]["set"]
 

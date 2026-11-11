@@ -7,7 +7,7 @@ from typing import Any
 
 from ..contracts import Principal
 
-NAMESPACE = "HarnessRag"
+NAMESPACE = "FinanceAgents"
 USER = f"{NAMESPACE}::User"
 GROUP = f"{NAMESPACE}::Group"
 DOCUMENT = f"{NAMESPACE}::Document"

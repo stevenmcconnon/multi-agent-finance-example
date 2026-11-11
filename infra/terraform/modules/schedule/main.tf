@@ -1,4 +1,5 @@
-# Daily EDGAR refresh: EventBridge Scheduler runs the api image once with the ingest CLI.
+# Daily EDGAR refresh: EventBridge Scheduler runs the api image once with the ingest CLI (`run`: the newest
+# filing per form per ticker; the pinned demo corpus is `cli demo`, a one-off).
 resource "aws_iam_role" "scheduler" {
   name = "${var.project}-scheduler"
   assume_role_policy = jsonencode({
@@ -54,7 +55,7 @@ resource "aws_scheduler_schedule" "ingest" {
     input = jsonencode({
       containerOverrides = [{
         name    = var.container_name
-        command = ["python", "-m", "finance_agents.ingest.cli", "run", "--tickers", "AAPL,MSFT", "--forms", "10-K,8-K", "--limit", "2"]
+        command = ["python", "-m", "finance_agents.ingest.cli", "run", "--tickers", "AAPL,MSFT", "--forms", "10-K,8-K", "--limit", "1"]
       }]
     })
   }

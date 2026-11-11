@@ -30,7 +30,10 @@ _INJECTION = re.compile(
     r"|act as (?:an? |the )?(?:admin|administrator|root|developer|system)"
     r"|you are now (?:an? |the )?(?:admin|administrator|root|developer|unrestricted)"
     r"|show (?:me )?(?:the )?documents? (?:you|i) (?:may|can|are) not"
-    r"|bypass (?:your |the )?(?:acl|permissions?|policy|filters?)"
+    r"|(?:ignore|bypass|disregard|override|circumvent) (?:(?:your|the|my|all|any|these|those) )*"
+    r"(?:acls?|permissions?|access controls?|polic(?:y|ies)|rules|restrictions|filters?)"
+    r"|show (?:me )?[^.?!]{0,80}?(?:you|i) (?:are|am|\'re|\'m) not (?:allowed|permitted|authorized)"
+    r"|\bas an? admin(?:istrator)?\b"
     r"|jailbreak|DAN mode",
     re.IGNORECASE,
 )

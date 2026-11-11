@@ -1,17 +1,30 @@
+import { answerOutcome, modelName } from "@/lib/present";
 import type { Answer } from "@/lib/schemas";
 import CitationList from "./CitationList";
 
 export default function AnswerCard({ answer }: { answer: Answer }) {
   const pct = Math.round(answer.confidence * 100);
   const v = answer.verification;
-  if (answer.abstained) {
+  const outcome = answerOutcome(answer.reason, answer.abstained);
+  if (outcome.kind === "done") {
+    return (
+      <div className="rounded border border-green-300 bg-green-50 p-4 dark:border-green-700 dark:bg-green-950/40">
+        <p className="flex flex-wrap items-center gap-2 font-medium text-green-900 dark:text-green-200">
+          <span className="rounded bg-green-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">{outcome.badge}</span>
+          {outcome.headline}
+        </p>
+        {answer.text && <p className="mt-1 break-words text-sm text-green-900/80 dark:text-green-200/80">{answer.text}</p>}
+      </div>
+    );
+  }
+  if (outcome.kind === "none") {
     return (
       <div className="rounded border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/40">
         <p className="flex flex-wrap items-center gap-2 font-medium text-amber-900 dark:text-amber-200">
-          <span className="rounded bg-amber-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">Abstained</span>
-          No authorized evidence, so no answer
+          <span className="rounded bg-amber-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">{outcome.badge}</span>
+          {outcome.headline}
         </p>
-        {answer.text && <p className="mt-1 text-sm text-amber-900/80 dark:text-amber-200/80">{answer.text}</p>}
+        {answer.text && <p className="mt-1 break-words text-sm text-amber-900/80 dark:text-amber-200/80">{answer.text}</p>}
       </div>
     );
   }
@@ -29,7 +42,7 @@ export default function AnswerCard({ answer }: { answer: Answer }) {
         <p title="Verification compares every draft claim with the authorized evidence before the answer is shown." className={`text-xs ${v.grounded ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>
           Verification: {v.grounded ? "grounded" : "not grounded"} · {v.unsupported_claims.length} unsupported claim
           {v.unsupported_claims.length === 1 ? "" : "s"}
-          {v.verifier_model && <span className="text-neutral-500"> · {v.verifier_model}</span>}
+          {v.verifier_model && <span className="text-neutral-500"> · {modelName(v.verifier_model)}</span>}
           {v.unsupported_claims.length > 0 && (
             <ul className="ml-4 mt-1 list-disc">
               {v.unsupported_claims.map((c) => <li key={c}>{c}</li>)}

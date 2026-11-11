@@ -24,7 +24,7 @@ variable "image_tag" {
 }
 
 variable "model_ids" {
-  description = "Bedrock model ids (defaults match .env.example)."
+  description = "Bedrock model ids. Claude ids are inference profile ids (the bare model ids are not invocable on demand)."
   type = object({
     generation = string
     verifier   = string
@@ -32,8 +32,8 @@ variable "model_ids" {
     rerank     = string
   })
   default = {
-    generation = "anthropic.claude-sonnet-4-5-20250929-v1:0"
-    verifier   = "anthropic.claude-haiku-4-5-20251001-v1:0"
+    generation = "us.anthropic.claude-sonnet-5-5"
+    verifier   = "us.anthropic.claude-haiku-5-5"
     embedding  = "amazon.titan-embed-text-v2:0"
     rerank     = "cohere.rerank-v3-5:0"
   }

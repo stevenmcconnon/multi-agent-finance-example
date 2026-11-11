@@ -1,12 +1,16 @@
-"""Tool planning: the fake heuristic and Bedrock Converse native tool use, both offline."""
+"""The model gateway offline: the deterministic stub (understand, plan, extractive generate) and the Bedrock
+adapter against a stubbed bedrock-runtime client (nothing here can spend)."""
 
 from __future__ import annotations
 
 import pytest
-from finance_agents.contracts import RiskLevel, ToolSpec
-from finance_agents.gateway import FakeGateway
+from botocore.exceptions import ClientError
+from finance_agents.config import Settings
+from finance_agents.contracts import ModelRole, QueryIntent, RiskLevel, ToolSpec
+from finance_agents.gateway import ABSTAIN_TEXT, FakeGateway, format_evidence, take_notes
 from finance_agents.gateway.bedrock import BedrockGateway
 from finance_agents.gateway.fake import understand_heuristic
+from finance_agents.interfaces import ModelCallFailed, ModelRefused
 
 SEARCH = ToolSpec(name="search_documents", description="search", input_schema={"type": "object"})
 FACTS = ToolSpec(name="facts_sql", description="facts", input_schema={"type": "object"})
@@ -42,6 +46,84 @@ async def test_fake_never_plans_a_tool_it_was_not_offered():
     assert await _plan(FakeGateway(), "Create a ticket: review ACLs", [SEARCH, FACTS]) == []
     calls = await _plan(FakeGateway(), "What was AAPL revenue in 2023?", [SEARCH])
     assert [c.tool for c in calls] == ["search_documents"]
+
+
+# ---------- the offline stub ----------
+@pytest.mark.parametrize(
+    "question, intent, entities, concepts, period",
+    [
+        ("What risks does Apple describe about its supply chain?", "lookup", ["AAPL"], [], None),
+        ("What was Apple's revenue in fiscal 2026?", "numeric", ["AAPL"], ["Revenues"], "2026"),
+        (
+            "How did Apple's net income change from fiscal 2024 to fiscal 2026?",
+            "compare",
+            ["AAPL"],
+            ["NetIncomeLoss"],
+            "2024,2026",
+        ),
+        ("Which Microsoft director is not standing for re-election?", "lookup", ["MSFT"], [], None),
+        ("Create a ticket to review Apple's 10-K risk section", "action", [], [], None),
+        ("please open a ticket about the audit", "action", [], [], None),
+        ("What were microsoft's earnings per share in 2025?", "numeric", ["MSFT"], ["EarningsPerShareDiluted"], "2025"),
+        (
+            "How much cash and total assets did NVIDIA report?",
+            "numeric",
+            ["NVDA"],
+            ["Assets", "CashAndCashEquivalentsAtCarryingValue"],
+            None,
+        ),
+        ("What does Amazon say about profit growth?", "compare", ["AMZN"], ["NetIncomeLoss"], None),
+        ("Write me a poem about autumn.", "out_of_scope", [], [], None),
+    ],
+)
+def test_understand_heuristic(question, intent, entities, concepts, period):
+    u = understand_heuristic(question)
+    assert (u.intent, u.entities, u.concepts, u.period_hint) == (QueryIntent(intent), entities, concepts, period)
+
+
+async def _write(question: str, evidence: list[str]) -> str:
+    prompt = f"QUESTION: {question}\n\nEVIDENCE:\n{format_evidence(evidence)}"
+    text, usage = await FakeGateway().complete(ModelRole.generate, "sys", [{"role": "user", "content": prompt}])
+    assert usage.model == "offline-stub"
+    return text
+
+
+async def test_stub_writer_picks_the_relevant_sentence_and_skips_fragments():
+    relevant = "The Company depends on single-source suppliers, which exposes its supply chain to disruption."
+    chunk = f"and other matters described below. Item 1A covers many topics in general terms only. {relevant}"
+    fact = (
+        "AAPL revenue for the fiscal year ended 2026-09-26: "
+        "$478.83 billion (USD 478,834,000,000; XBRL concept Revenues)."
+    )
+    text = await _write(
+        "What risks does Apple describe about its supply chain?",
+        [
+            "Indicate by check mark whether the registrant has supply chain risks described ☐ Yes ☒ No today.",
+            chunk,
+            "Unrelated remarks about the weather in Cupertino on a sunny afternoon in late spring.",
+            fact,
+            "Supply risks.",
+        ],
+    )
+    assert text == f"{fact} [4] {relevant} [2]"  # the structured fact first, then the best sentence, verbatim
+    assert await _write("Which director plans to retire?", [chunk]) == ABSTAIN_TEXT
+
+
+async def test_stub_writer_keeps_at_most_five_sentences_and_drops_weak_matches():
+    weak = [f"Paragraph {i} mentions the supply of parts in passing and nothing else at all." for i in range(6)]
+    strong = "Supply chain risks include reliance on outsourcing partners located in a few regions."
+    assert (await _write("What supply chain risks exist?", weak)).count("[") == 5  # equal scores: the first five
+    # one shared word beside three is noise
+    assert await _write("What supply chain risks exist?", [*weak, strong]) == f"{strong} [7]"
+
+
+async def test_stub_writer_keeps_a_name_with_an_initial_whole_and_drops_the_list_marker():
+    said = (
+        "On November 4, 2026, Emma N. Walmsley, a member of the Board of Directors of Microsoft Corporation, "
+        "informed the Company of her decision not to stand for re-election."
+    )
+    chunk = f"Item 5.02. Departure of Directors or Certain Officers. (b) {said} Ms. Walmsley will serve until then."
+    assert await _write("Which Microsoft director is not standing for re-election?", [chunk]) == f"{said} [1]"
 
 
 class _Converse:
@@ -89,3 +171,108 @@ async def test_bedrock_end_turn_without_tool_use_plans_nothing():
     client = _Converse({"stopReason": "end_turn", "output": {"message": {"content": [{"text": "No tool needed."}]}}})
     assert await _plan(BedrockGateway(client=client), "hello?", ALL) == []
     assert await _plan(BedrockGateway(client=client), "hello?", []) == []  # no tools offered -> no model call
+
+
+# ---------- the Bedrock adapter (docs/CONTRACTS.md "Bedrock models") ----------
+class _Raises:
+    def __init__(self, code: str):
+        self.code = code
+
+    def converse(self, **kwargs):
+        raise ClientError({"Error": {"Code": self.code, "Message": "no"}}, "Converse")
+
+
+def _reply(parts, stop="end_turn"):
+    return {
+        "stopReason": stop,
+        "output": {"message": {"content": parts}},
+        "usage": {"inputTokens": 3, "outputTokens": 5},
+    }
+
+
+def test_default_models_are_the_inference_profile_ids():
+    fresh = Settings(_env_file=None)
+    assert fresh.bedrock_generation_model == "us.anthropic.claude-sonnet-5-5"
+    assert fresh.bedrock_verifier_model == "us.anthropic.claude-haiku-5-5"
+
+
+@pytest.mark.parametrize(
+    "role, cap, model",
+    [
+        (ModelRole.generate, 8000, "us.anthropic.claude-sonnet-5-5"),
+        (ModelRole.verify, 4000, "us.anthropic.claude-haiku-5-5"),
+        (ModelRole.understand, 2000, "us.anthropic.claude-haiku-5-5"),
+    ],
+)
+async def test_bedrock_complete_sends_no_temperature_and_reads_text_parts_only(monkeypatch, role, cap, model):
+    monkeypatch.setattr(
+        "finance_agents.gateway.bedrock.settings.bedrock_generation_model", "us.anthropic.claude-sonnet-5-5"
+    )
+    monkeypatch.setattr(
+        "finance_agents.gateway.bedrock.settings.bedrock_verifier_model", "us.anthropic.claude-haiku-5-5"
+    )
+    client = _Converse(
+        _reply(
+            [
+                {"reasoningContent": {"reasoningText": {"text": "thinking it over", "signature": "s"}}},
+                {"text": "Revenue grew. "},
+                {"reasoningContent": {"redactedContent": b"x"}},
+                {"text": "[1]"},
+            ]
+        )
+    )
+    text, usage = await BedrockGateway(client=client).complete(
+        role, "sys", [{"role": "user", "content": "q"}], max_tokens=300
+    )
+    assert text == "Revenue grew. [1]" and usage.model == model and usage.output_tokens == 5
+    assert client.kwargs["modelId"] == model  # the inference profile id, as configured
+    assert client.kwargs["inferenceConfig"] == {"maxTokens": cap}  # no temperature, no top_p; room for thinking
+
+
+@pytest.mark.parametrize("stop", ["refusal", "content_filtered", "guardrail_intervened"])
+async def test_bedrock_refusal_raises_model_refused(stop):
+    client = _Converse(_reply([{"text": "I can't help with that."}], stop))
+    with pytest.raises(ModelRefused):
+        await BedrockGateway(client=client).complete(ModelRole.generate, "sys", [{"role": "user", "content": "q"}])
+
+
+async def test_bedrock_generate_failure_names_the_aws_error_code_and_the_model():
+    gw = BedrockGateway(client=_Raises("AccessDeniedException"))
+    with pytest.raises(ModelCallFailed) as err:
+        await gw.complete(ModelRole.generate, "sys", [{"role": "user", "content": "q"}])
+    assert err.value.code == "AccessDeniedException"
+    assert "AccessDeniedException" in str(err.value) and gw.models[ModelRole.generate] in str(err.value)
+
+
+async def test_bedrock_understand_and_plan_fall_back_out_loud():
+    gw = BedrockGateway(client=_Raises("ThrottlingException"))
+    take_notes()
+    understood = await gw.understand("What was AAPL revenue in 2023?")
+    assert understood.intent == QueryIntent.numeric  # the heuristic's answer
+    assert take_notes() == ["classifier call failed (ThrottlingException); used the deterministic fallback"]
+    calls = await gw.plan("What was AAPL revenue in 2023?", understood, ALL)
+    assert [c.tool for c in calls] == ["facts_sql", "search_documents"]
+    assert take_notes() == ["planner call failed (ThrottlingException); used the deterministic fallback"]
+    assert take_notes() == []
+
+
+async def test_bedrock_plan_reads_tool_use_after_reasoning_whatever_the_stop_reason():
+    client = _Converse(
+        _reply(
+            [
+                {"reasoningContent": {"reasoningText": {"text": "a figure: facts", "signature": "s"}}},
+                {
+                    "toolUse": {
+                        "toolUseId": "1",
+                        "name": "facts_sql",
+                        "input": {"entity": "AAPL", "concept": "Revenues"},
+                    }
+                },
+            ],
+            stop="end_turn",
+        )
+    )
+    calls = await _plan(BedrockGateway(client=client), "What was AAPL revenue in 2023?", ALL)
+    assert [c.tool for c in calls] == ["facts_sql"]
+    assert client.kwargs["inferenceConfig"] == {"maxTokens": 4000}
+    assert client.kwargs["modelId"] == BedrockGateway().models[ModelRole.generate]

@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { getConfig } from "@/lib/api";
+import { answerOutcome, sectionLabel } from "@/lib/present";
 import type { TurnEvent } from "@/lib/schemas";
 import { groupTimelineItems, type TimelinePhase } from "@/lib/timeline";
 import AnswerCard from "./AnswerCard";
@@ -21,9 +24,9 @@ const KIND_HELP: Record<Kind, string> = {
 const AGENT_HELP: Record<string, string> = {
   Guardrail: "Checks and redacts what enters or leaves the turn. It complements authorization; it does not replace it.",
   Planner: "Understands the question and selects only tools this user is allowed to call.",
-  Guard: "Checks verified identity and Cedar authorization policy. Errors fail closed.",
+  Guard: "Applies Cedar authorization policy to the identity the API already verified. Errors fail closed.",
   Researcher: "Runs guarded tools and assembles only evidence the current user may read.",
-  Approver: "A person who explicitly approves or denies a write or money action.",
+  Approver: "A person who explicitly approves or denies a write action.",
   Writer: "Drafts an answer using only the numbered evidence returned by the Researcher.",
   Judge: "Checks the draft against the evidence. Unsupported claims retry once, then abstain.",
   answer: "The grounded answer and its citations, or a safe abstention when evidence is unavailable.",
@@ -44,8 +47,8 @@ const PHASE: Record<TimelinePhase, { eyebrow: string; title: string; description
   },
   authorization: {
     eyebrow: "AUTHORIZE",
-    title: "Check identity and policy",
-    description: "The Guard asks Cedar whether this verified principal may answer. A policy outage denies access.",
+    title: "Apply policy to the verified identity",
+    description: "The API has already verified who is asking. The Guard asks Cedar whether that identity may do this. A policy outage denies access.",
     className: "border-teal-300 bg-teal-50/70 dark:border-teal-800 dark:bg-teal-950/25",
   },
   planning: {
@@ -63,7 +66,7 @@ const PHASE: Record<TimelinePhase, { eyebrow: string; title: string; description
   approval: {
     eyebrow: "HUMAN CHECK",
     title: "Approve or deny the action",
-    description: "Write and money tools stop here. Approval resumes the guarded call exactly once; denial changes nothing.",
+    description: "Write actions stop here. Approval resumes the guarded call exactly once; denial changes nothing.",
     className: "border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/25",
   },
   verification: {
@@ -125,7 +128,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function EventRow({ item, index, busy, onDecide }: { item: TimelineItem; index: number; busy: boolean; onDecide: (approved: boolean) => void }) {
+function EventRow({ item, index, busy, answered, onDecide }: { item: TimelineItem; index: number; busy: boolean; answered: boolean; onDecide: (approved: boolean) => void }) {
+  // "uncited" only means something for a real answer: an abstention or an action has nothing to cite
   const { event: e, hitlDecision } = item;
   switch (e.type) {
     case "guardrail":
@@ -135,8 +139,8 @@ function EventRow({ item, index, busy, onDecide }: { item: TimelineItem; index: 
           <strong>{e.data.stage === "input" ? "Input checked" : "Output checked"}</strong>
           {e.data.injection_suspected && <Badge ok={false} title="A prompt-injection pattern was detected and recorded. Authorization remains the enforcement boundary.">injection suspected</Badge>}
           {e.data.redactions.length > 0 && <span className="ml-2 text-neutral-600 dark:text-neutral-300">redacted: {e.data.redactions.join(", ")}</span>}
-          {e.data.uncited && <Badge ok={false} title="The output contains prose but no citation.">uncited output</Badge>}
-          {!e.data.injection_suspected && e.data.redactions.length === 0 && !e.data.uncited && <span className="ml-2 text-neutral-500">no issues found</span>}
+          {e.data.uncited && answered && <Badge ok={false} title="The output contains prose but no citation.">uncited output</Badge>}
+          {!e.data.injection_suspected && e.data.redactions.length === 0 && !(e.data.uncited && answered) && <span className="ml-2 text-neutral-500">no issues found</span>}
         </Row>
       );
     case "status":
@@ -162,14 +166,14 @@ function EventRow({ item, index, busy, onDecide }: { item: TimelineItem; index: 
       return (
         <Row key={index} label="Researcher">
           <KindBadge kind="deterministic" />{" "}
-          <span title="Candidates are found by semantic and keyword search. Only chunks that pass document permissions continue.">
-            {e.data.candidate_count} candidates → <strong>{e.data.chunks.length} authorized</strong>
+          <span title="Every candidate already passed the document-permission filter in the database query. The reranker keeps the most relevant ones above its relevance floor.">
+            {e.data.candidate_count} authorized candidates → <strong>{e.data.chunks.length ? `${e.data.chunks.length} kept after rerank` : "none relevant enough"}</strong>
           </span>
           <ul className="mt-2 space-y-1 border-l-2 border-sky-300 pl-3 dark:border-sky-700">
             {e.data.chunks.map((chunk, chunkIndex) => (
               <li key={`${chunk.document_id}-${chunkIndex}`} className="flex flex-wrap gap-x-2 text-neutral-700 dark:text-neutral-300">
                 <span className="break-words">{chunk.title ?? chunk.document_id}</span>
-                {chunk.section && <span className="text-neutral-500">{chunk.section}</span>}
+                {sectionLabel(chunk.section) && <span className="text-neutral-500">{chunk.section}</span>}
                 {chunk.score != null && <span title="Reranker relevance score" className="font-mono text-xs text-neutral-500">{chunk.score.toFixed(3)}</span>}
               </li>
             ))}
@@ -181,7 +185,7 @@ function EventRow({ item, index, busy, onDecide }: { item: TimelineItem; index: 
         <Row key={index} label="Researcher">
           <KindBadge kind="deterministic" />{" "}
           <Badge ok={e.data.ok} title="Result returned by the policy-enforced tool runner.">{e.data.ok ? "ok" : "failed"}</Badge>{" "}
-          <span className="font-mono">{e.data.tool}</span>
+          <span className="break-all font-mono">{e.data.tool}</span>
           <span className="text-neutral-500"> · {e.data.latency_ms} ms{e.data.from_cache && " · cached"}</span>
           {e.data.error && <p className="text-red-700 dark:text-red-300">{e.data.error}</p>}
         </Row>
@@ -204,7 +208,7 @@ function EventRow({ item, index, busy, onDecide }: { item: TimelineItem; index: 
     case "error":
       return (
         <Row key={index} label="error">
-          <p className="rounded border border-red-300 bg-red-50 p-2 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+          <p className="break-words rounded border border-red-300 bg-red-50 p-2 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
             <span className="font-mono">{e.data.code}</span>: {e.data.message}
           </p>
         </Row>
@@ -214,7 +218,13 @@ function EventRow({ item, index, busy, onDecide }: { item: TimelineItem; index: 
 
 export default function EventTimeline({ items, busy, onDecide }: Props) {
   const tokens = items.filter((item) => item.event.type === "token").map((item) => (item.event.data as { text: string }).text).join("");
-  const hasAnswer = items.some((item) => item.event.type === "answer");
+  const answer = items.find((item) => item.event.type === "answer")?.event;
+  const hasAnswer = answer !== undefined;
+  const answered = answer?.type === "answer" && answerOutcome(answer.data.reason, answer.data.abstained).kind === "answer";
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    getConfig().then((c) => setOffline(c !== null && c.model_backend !== "bedrock"));
+  }, []);
   const groups = groupTimelineItems(items);
 
   return (
@@ -222,7 +232,7 @@ export default function EventTimeline({ items, busy, onDecide }: Props) {
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <strong className="mr-1 text-sm">How to read this turn</strong>
         {(["deterministic", "model", "human"] as const).map((kind) => (
-          <span key={kind} title={KIND_HELP[kind]} className={`rounded-full px-2 py-1 font-medium ${KIND_STYLE[kind]}`}>{kind}</span>
+          <span key={kind} title={KIND_HELP[kind] + (kind === "model" && offline ? " (offline stand-in in this mode)" : "")} className={`rounded-full px-2 py-1 font-medium ${KIND_STYLE[kind]}`}>{kind}</span>
         ))}
         <span className="text-neutral-500">Hover or focus a badge, agent name, or ? for context.</span>
       </div>
@@ -239,7 +249,7 @@ export default function EventTimeline({ items, busy, onDecide }: Props) {
               <InfoTip label={meta.title} text={meta.description} />
             </header>
             <ol className="mt-3 space-y-2 border-l-2 border-current/15 pl-2">
-              {group.items.map((item, itemIndex) => <EventRow key={itemIndex} item={item} index={itemIndex} busy={busy} onDecide={onDecide} />)}
+              {group.items.map((item, itemIndex) => <EventRow key={itemIndex} item={item} index={itemIndex} busy={busy} answered={answered} onDecide={onDecide} />)}
             </ol>
           </section>
         );

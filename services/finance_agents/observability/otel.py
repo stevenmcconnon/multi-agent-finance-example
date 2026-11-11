@@ -33,13 +33,18 @@ def setup_otel(app: FastAPI) -> None:
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-        provider = TracerProvider(resource=Resource.create({SERVICE_NAME: settings.otel_service_name}))
+        # Phoenix files traces under this project name instead of "default".
+        resource = Resource.create(
+            {SERVICE_NAME: settings.otel_service_name, "openinference.project.name": "multi-agent-finance"}
+        )
+        provider = TracerProvider(resource=resource)
         for endpoint in (settings.otel_exporter_otlp_endpoint, settings.phoenix_collector_endpoint):
             provider.add_span_processor(
                 BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces", timeout=5))
             )
         trace.set_tracer_provider(provider)
-        FastAPIInstrumentor.instrument_app(app, tracer_provider=provider)
+        # The container health check calls /healthz every few seconds; traced, it buries the agent turns.
+        FastAPIInstrumentor.instrument_app(app, tracer_provider=provider, excluded_urls="healthz,metrics")
         PsycopgInstrumentor().instrument(tracer_provider=provider)
         try:
             from openinference.instrumentation.langchain import LangChainInstrumentor
@@ -57,3 +62,31 @@ def setup_otel(app: FastAPI) -> None:
         )
     except Exception as exc:
         log.warning("Prometheus /metrics not enabled: %s", exc)
+
+
+def record_tool_span(tool: str, arguments: dict, ok: bool, error: str | None, elapsed_s: float, user: str) -> None:
+    """One TOOL span per guarded tool call, so a trace shows what the Researcher ran and how it ended.
+    Emitted after the call with its real start time; never raises into the caller."""
+    try:
+        import json
+        import time
+
+        from opentelemetry import trace
+        from opentelemetry.trace import Status, StatusCode
+
+        end = time.time_ns()
+        span = trace.get_tracer("finance_agents.harness").start_span(
+            f"tool {tool}",
+            start_time=end - int(elapsed_s * 1e9),
+            attributes={
+                "openinference.span.kind": "TOOL",
+                "tool.name": tool,
+                "input.value": json.dumps(arguments, default=str)[:2000],
+                "output.value": "ok" if ok else f"refused or failed: {error}",
+                "user.id": user,
+            },
+        )
+        span.set_status(Status(StatusCode.OK if ok else StatusCode.ERROR, None if ok else error))
+        span.end(end_time=end)
+    except Exception as exc:  # tracing must never break a tool call
+        log.debug("tool span not recorded: %s", exc)

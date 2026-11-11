@@ -258,3 +258,148 @@ async def test_bedrock_embedder_retries_throttling_then_succeeds():
 
     vecs = await BedrockEmbedder(client=Client()).embed(["a"])
     assert len(vecs) == 1 and len(calls) == 3
+
+
+# ---- section names: SEC item headings in the text flow (EDGAR HTML has no h-tags) ----
+def test_parse_10k_items_name_sections_and_the_table_of_contents_does_not():
+    html = (
+        b"<html><body><div>Annual report cover.</div>"
+        # table of contents: the same headings, split across cells
+        b"<table><tr><td>Part I</td></tr><tr><td><a>Item 1.</a></td><td><a>Business</a></td><td>1</td></tr>"
+        b"<tr><td><a>Item 1A.</a></td><td><a>Risk Factors</a></td><td>5</td></tr></table>"
+        b"<div><span>PART I</span></div><div><span>Item 1.&#160;&#160;&#160;Business</span></div>"
+        b"<div>We make phones. See Part I, Item 1A of this Form 10-K under the heading Risk Factors.</div>"
+        b"<div>PART I</div><div>Item 1A</div>"  # running page header: no period, not a heading
+        b"<p><span>ITEM 1A. RIS</span><span>K FACTORS</span></p>"  # one styled heading, two text nodes
+        b"<div>Our supply chain is concentrated.</div>"
+        b"<div>As set out in <a>Item 7. Management's Discussion</a>, costs rose.</div>"
+        b"</body></html>"
+    )
+    sections = parse.parse(html, "text/html")
+    assert [s for s, _ in sections] == ["Cover page", "Item 1. Business", "Item 1A. RISK FACTORS"]
+    cover, business, risks = (t for _, t in sections)
+    assert cover.startswith("Annual report cover.") and "Risk Factors 5" in cover  # the contents stay on the cover
+    assert business.startswith("We make phones.")
+    assert (
+        "supply chain" in risks and "As set out in Item 7. Management's Discussion , costs rose." in risks
+    )  # a cross-reference
+    assert {s for s, _ in parse.chunk(sections)} == {s for s, _ in sections}
+
+
+def test_parse_8k_items_with_and_without_an_inline_title():
+    html = (
+        "<html><body><p>FORM 8-K CURRENT REPORT</p>"
+        "<p>Item 5.02. Departure of Directors or Certain Officers; Election of Directors; Appointment of "
+        "Certain Officers; Compensatory Arrangements of Certain Officers. </p><p>(b) A director will not stand.</p>"
+        "<div><div><span>Item 8.01</span></div><div><span>Other Events.</span></div></div><div>Notes were sold.</div>"
+        "</body></html>"
+    ).encode()
+    assert parse.parse(html, "text/html") == [
+        ("Cover page", "FORM 8-K CURRENT REPORT"),
+        (
+            "Item 5.02. Departure of Directors or Certain Officers; Election of Directors; Appointment of "
+            "Certain Officers; Compensatory Arrangements of Certain Officers",
+            "(b) A director will not stand.",
+        ),
+        ("Item 8.01. Other Events", "Notes were sold."),
+    ]
+
+
+# ---- discover: newest `limit` per form, so two fresh 8-Ks cannot crowd out the 10-K ----
+async def test_discover_takes_the_newest_per_form(monkeypatch):
+    from finance_agents.ingest import edgar, workflow
+
+    async def ciks():
+        return {"MSFT": 789019}
+
+    async def submissions(cik):
+        rows = [("8-K", "a3"), ("8-K", "a2"), ("4", "x"), ("10-K", "k2"), ("8-K", "a1"), ("10-K", "k1")]
+        return [
+            {"form": f, "accessionNumber": a, "primaryDocument": "d.htm", "filingDate": "2026-01-01", "reportDate": ""}
+            for f, a in rows
+        ]
+
+    monkeypatch.setattr(edgar, "ticker_to_cik", ciks)
+    monkeypatch.setattr(edgar, "submissions", submissions)
+    msgs = await workflow.discover(MSG["org_id"], ["MSFT"], ["10-K", "8-K"], 1)
+    assert [(m["form"], m["source_id"]) for m in msgs] == [("10-K", "k2"), ("8-K", "a3")]
+
+
+# ---- demo corpus: pinned manifest, honest summary, non-zero exit on a half load ----
+def _cli(monkeypatch, agent="demo-app someone@corp.test"):
+    from finance_agents.ingest import cli, edgar
+
+    async def ciks():
+        return {}
+
+    monkeypatch.setattr(edgar.settings, "edgar_user_agent", agent)
+    monkeypatch.setattr(edgar, "ticker_to_cik", ciks)
+    return cli
+
+
+def test_demo_corpus_manifest_is_the_five_pinned_filings():
+    from finance_agents.ingest import demo_corpus
+
+    msgs = demo_corpus.messages(MSG["org_id"])
+    assert [(m["ticker"], m["form"], m["source_id"]) for m in msgs] == [
+        ("AAPL", "10-K", "0000320193-26-000026"),
+        ("MSFT", "10-K", "0001193125-26-323660"),
+        ("AAPL", "8-K", "0001140361-26-042798"),
+        ("MSFT", "8-K", "0001193125-26-447173"),
+        ("MSFT", "8-K", "0001193125-26-448357"),
+    ]
+    assert msgs[0]["uri"] == "https://www.sec.gov/Archives/edgar/data/320193/000032019326000026/aapl-20260926.htm"
+    assert all(m["filed_at"] and m["report_date"] and m["version"] == m["source_id"] for m in msgs)
+
+
+def test_demo_command_reports_each_filing_and_fails_on_a_half_load(monkeypatch):
+    from typer.testing import CliRunner
+
+    cli = _cli(monkeypatch)
+
+    async def ingest(msg):
+        if msg["form"] == "10-K" and msg["ticker"] == "MSFT":
+            raise RuntimeError("edgar 503")
+        return "succeeded"
+
+    async def ready(org, source_ids):  # what the database holds afterwards
+        return {s: 7 for s in source_ids if s != "0001193125-26-323660"}
+
+    monkeypatch.setattr(cli, "ingest_inline", ingest)
+    monkeypatch.setattr(cli, "_ready", ready)
+    result = CliRunner().invoke(cli.app, ["demo", "--inline"])
+    assert result.exit_code == 1
+    lines = result.output.strip().splitlines()
+    assert lines[0] == "AAPL 10-K 0000320193-26-000026: ready (7 chunks)"
+    assert lines[1] == "MSFT 10-K 0001193125-26-323660: FAILED edgar 503"
+    assert lines[-1] == "demo corpus: 4/5 filings ready" and len(lines) == 6
+
+    async def all_ready(org, source_ids):
+        return {s: 7 for s in source_ids}
+
+    monkeypatch.setattr(cli, "_ready", all_ready)
+    result = CliRunner().invoke(cli.app, ["demo", "--inline"])
+    assert result.exit_code == 0 and result.output.strip().endswith("demo corpus: 5/5 filings ready")
+
+
+# ---- EDGAR refuses a missing or placeholder User-Agent: one readable line, exit 2, no stack trace ----
+def test_placeholder_user_agent_is_refused_before_any_request(monkeypatch):
+    from typer.testing import CliRunner
+
+    cli = _cli(monkeypatch, agent="multi-agent-finance-example contact@example.com")
+    for args in (["demo"], ["run", "--tickers", "AAPL"]):
+        result = CliRunner().invoke(cli.app, args)
+        assert result.exit_code == 2 and "Traceback" not in result.output
+        assert "set EDGAR_USER_AGENT in .env" in result.output and len(result.output.strip().splitlines()) == 1
+
+
+async def test_edgar_403_becomes_the_user_agent_message(monkeypatch):
+    from functools import partial
+
+    import httpx
+    from finance_agents.ingest import edgar
+
+    transport = httpx.MockTransport(lambda request: httpx.Response(403))
+    monkeypatch.setattr(edgar.httpx, "AsyncClient", partial(httpx.AsyncClient, transport=transport))
+    with pytest.raises(edgar.EdgarAccessError, match="EDGAR_USER_AGENT"):
+        await edgar.fetch_document("https://www.sec.gov/x")

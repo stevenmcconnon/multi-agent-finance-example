@@ -3,9 +3,9 @@
 // when they, or any group they belong to, are in the document's ACL (resource.readers).
 @id("document_acl_read")
 permit (
-  principal is HarnessRag::User,
-  action in [HarnessRag::Action::"retrieve", HarnessRag::Action::"answer"],
-  resource is HarnessRag::Document
+  principal is FinanceAgents::User,
+  action in [FinanceAgents::Action::"retrieve", FinanceAgents::Action::"answer"],
+  resource is FinanceAgents::Document
 ) when {
   resource.org == principal.org &&
   principal.roles.containsAny(["viewer", "analyst", "admin"]) &&
@@ -16,9 +16,9 @@ permit (
 // The row-level ACL predicate in retrieval/hybrid.py still filters every candidate.
 @id("org_read")
 permit (
-  principal is HarnessRag::User,
-  action in [HarnessRag::Action::"retrieve", HarnessRag::Action::"answer"],
-  resource is HarnessRag::Org
+  principal is FinanceAgents::User,
+  action in [FinanceAgents::Action::"retrieve", FinanceAgents::Action::"answer"],
+  resource is FinanceAgents::Org
 ) when {
   resource.org == principal.org &&
   principal.roles.containsAny(["viewer", "analyst", "admin"])

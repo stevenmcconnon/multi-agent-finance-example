@@ -44,7 +44,9 @@ class FastEmbedReranker:
                 if self._model is None:
                     from fastembed.rerank.cross_encoder import TextCrossEncoder
 
-                    self._model = await asyncio.to_thread(TextCrossEncoder, model_name=self.model_name, threads=2)
+                    # Library-default threads: a cap of 2 made every search several times slower (measured
+                    # 2026-11-11). batch_size=8 in rerank() is what bounds the memory.
+                    self._model = await asyncio.to_thread(TextCrossEncoder, model_name=self.model_name)
         return self._model
 
     async def rerank(self, query: str, chunks: list[Chunk], top_n: int) -> list[Chunk]:

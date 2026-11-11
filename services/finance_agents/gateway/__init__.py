@@ -2,11 +2,40 @@
 
 from __future__ import annotations
 
-from ..config import settings
-from ..interfaces import ModelGateway
-from .fake import ABSTAIN_TEXT, FakeGateway, extract_json, format_evidence
+from contextvars import ContextVar
 
-__all__ = ["ABSTAIN_TEXT", "FakeGateway", "extract_json", "format_evidence", "get_gateway"]
+from ..config import settings
+from ..interfaces import ModelCallFailed, ModelGateway, ModelRefused
+
+# No silent stubs: when a gateway answers `understand` or `plan` from the deterministic fallback after a model
+# error it leaves a note here, and the graph node that made the call puts it in its status event. A ContextVar,
+# because one gateway instance serves concurrent turns and each graph node runs in its own task context.
+_notes: ContextVar[tuple[str, ...]] = ContextVar("gateway_notes", default=())
+
+
+def note(message: str) -> None:
+    _notes.set((*_notes.get(), message))
+
+
+def take_notes() -> list[str]:
+    notes = list(_notes.get())
+    _notes.set(())
+    return notes
+
+
+from .fake import ABSTAIN_TEXT, FakeGateway, extract_json, format_evidence  # noqa: E402  (after note: bedrock imports it)
+
+__all__ = [
+    "ABSTAIN_TEXT",
+    "FakeGateway",
+    "ModelCallFailed",
+    "ModelRefused",
+    "extract_json",
+    "format_evidence",
+    "get_gateway",
+    "note",
+    "take_notes",
+]
 
 
 def get_gateway(backend: str | None = None) -> ModelGateway:

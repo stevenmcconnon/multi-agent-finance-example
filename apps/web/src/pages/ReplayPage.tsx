@@ -14,7 +14,15 @@ export default function ReplayPage() {
       navigate("/", { replace: true });
       return;
     }
-    getReplay(id).then(setCheckpoints, (e) => setError(errorMessage(e)));
+    // refetched on a persona switch: the new person gets the plain "belongs to someone else" sentence, not a stale replay
+    const load = () => {
+      setCheckpoints(null);
+      setError(null);
+      getReplay(id).then(setCheckpoints, (e) => setError(errorMessage(e)));
+    };
+    load();
+    window.addEventListener("hr-persona", load);
+    return () => window.removeEventListener("hr-persona", load);
   }, [id, navigate]);
 
   return (

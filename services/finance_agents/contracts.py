@@ -67,6 +67,7 @@ class QueryIntent(StrEnum):
     lookup = "lookup"  # textual question over docs
     numeric = "numeric"  # table / value question -> facts + calculator
     compare = "compare"
+    action = "action"  # a request to DO something (a write tool), not a question over the filings
     out_of_scope = "out_of_scope"
 
 
@@ -161,11 +162,28 @@ class Verification(BaseModel):
     verifier_model: str = ""
 
 
+# Why the turn ended the way it did (docs/CONTRACTS.md "Demo-hardening decisions"); the web headline keys on it.
+AnswerReason = Literal[
+    "answered",
+    "no_relevant_evidence",  # the reader's permitted documents do not answer it, or the reader has none
+    "out_of_scope",
+    "policy_denied",
+    "not_grounded",  # a draft failed verification and was withheld
+    "model_declined",  # the model refused the request (Bedrock stopReason refusal / content filter / guardrail)
+    "action_done",
+    "action_denied",  # the human said no
+    "action_forbidden",  # the caller's role may not use the tool
+    "action_failed",  # approved, then the tool itself failed
+    "approval_pending",  # run_turn only: the turn is suspended at the approval interrupt
+]
+
+
 class Answer(BaseModel):
     text: str
     citations: list[Citation]
     confidence: float = Field(ge=0, le=1)
-    abstained: bool = False  # no authorized evidence -> no answer
+    abstained: bool = False  # anything but a cited answer or a completed action
+    reason: AnswerReason
     verification: Verification | None = None
     thread_id: str
     trace_id: str | None = None

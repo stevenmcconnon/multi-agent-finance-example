@@ -26,14 +26,14 @@ from .. import db
 from ..agent import graph
 from ..authz import audit
 from ..config import settings
-from ..contracts import Principal, TurnEvent
+from ..contracts import ModelRole, Principal, TurnEvent
 from ..guardrails import check_input, check_output
 from ..guardrails.bedrock import BedrockGuardrail
 from ..guardrails.ratelimit import LIMITER
 from ..harness import devtoken
 from ..harness.identity import InvalidToken, check_config, verify_token
 from ..observability import setup_otel
-from ..retrieval import sql
+from ..retrieval import get_embedder, get_reranker, sql
 
 log = logging.getLogger(__name__)
 
@@ -117,7 +117,9 @@ async def _guard_output(events: AsyncIterator[TurnEvent], first: TurnEvent | Non
         yield first
     async for ev in events:
         if ev.type == "answer":
-            out = check_output(ev.data.get("text") or "", len(ev.data.get("citations") or []))
+            out = check_output(
+                ev.data.get("text") or "", len(ev.data.get("citations") or []), ev.data.get("reason") or "answered"
+            )
             text = out.text
             if BEDROCK_GUARDRAIL.enabled:
                 text = (await BEDROCK_GUARDRAIL.apply(text, "OUTPUT")).text or text
@@ -149,6 +151,25 @@ async def healthz() -> JSONResponse:
         ok_redis = False
     ok = ok_db and ok_redis
     return JSONResponse({"ok": ok, "db": ok_db, "redis": ok_redis}, status_code=200 if ok else 503)
+
+
+@app.get("/config")
+async def config() -> dict[str, Any]:
+    """Which models this deployment runs (no auth, no secrets), so the web app can say so on screen and the
+    offline stub is never mistaken for a language model. Building the adapters loads no model weights."""
+    gw = graph._gw()
+    per_role = getattr(gw, "models", {})  # BedrockGateway: a model id per role; the stub has one name
+    stub = getattr(gw, "model_name", type(gw).__name__)
+    return {
+        "model_backend": settings.hr_model_backend,
+        "models": {
+            "generate": per_role.get(ModelRole.generate, stub),
+            "verify": per_role.get(ModelRole.verify, stub),
+            "embed": get_embedder().model_name,
+            "rerank": get_reranker().model_name,
+        },
+        "auth_mode": settings.hr_jwt_mode,
+    }
 
 
 @app.post("/auth/dev-token")

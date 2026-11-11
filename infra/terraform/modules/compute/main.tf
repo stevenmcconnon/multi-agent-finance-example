@@ -3,7 +3,16 @@
 locals {
   api_container = "api"
   log_groups    = toset(["api", "temporal", "phoenix", "ingest-worker"])
-  model_arns    = [for id in values(var.model_ids) : "arn:aws:bedrock:${var.region}::foundation-model/${id}"]
+  # A Claude id is an inference profile ("us.anthropic..."): invoking it needs the profile in this account
+  # AND the foundation model in whichever region the profile routes the call to. Titan and Cohere ids are
+  # plain foundation models in this region.
+  geo_prefix = "^(us|eu|apac|global)\\."
+  model_arns = flatten([for id in values(var.model_ids) :
+    length(regexall(local.geo_prefix, id)) > 0 ? [
+      "arn:aws:bedrock:${var.region}:${data.aws_caller_identity.current.account_id}:inference-profile/${id}",
+      "arn:aws:bedrock:*::foundation-model/${replace(id, "/${local.geo_prefix}/", "")}",
+    ] : ["arn:aws:bedrock:${var.region}::foundation-model/${id}"]
+  ])
 
   app_environment = [
     { name = "HR_MODE", value = "aws" },
@@ -63,6 +72,8 @@ resource "aws_ecr_repository" "this" {
 }
 
 # ---------------- IAM ----------------
+data "aws_caller_identity" "current" {}
+
 data "aws_iam_policy_document" "ecs_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -96,7 +107,7 @@ resource "aws_iam_role_policy" "execution_secret" {
   })
 }
 
-# Task role for api + ingest-worker: only the four models, the one guardrail, the one policy store, the one secret.
+# Task role for api + ingest-worker: only the four models (reranking goes through InvokeModel, so no bedrock:Rerank), the one guardrail, the one policy store, the one secret.
 resource "aws_iam_role" "app" {
   name               = "${var.project}-app"
   assume_role_policy = data.aws_iam_policy_document.ecs_assume.json

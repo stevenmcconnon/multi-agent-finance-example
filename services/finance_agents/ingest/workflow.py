@@ -88,7 +88,7 @@ def _load_raw(uri: str) -> bytes:
 # ---------- activities ----------
 @activity.defn
 async def discover(org_id: str, tickers: list[str], forms: list[str], limit: int) -> list[dict[str, Any]]:
-    """Newest `limit` filings per ticker among `forms`, as ingest messages."""
+    """Newest `limit` filings PER FORM per ticker, as ingest messages (so a run of 8-Ks cannot crowd out the 10-K)."""
     ciks = await edgar.ticker_to_cik()
     out: list[dict[str, Any]] = []
     for ticker in tickers:
@@ -96,8 +96,10 @@ async def discover(org_id: str, tickers: list[str], forms: list[str], limit: int
         if cik is None:  # a typo must not fail (and retry) the whole batch
             log.warning("ingest.unknown_ticker", ticker=ticker)
             continue
-        picked = [f for f in await edgar.submissions(cik) if f["form"] in forms and f["primaryDocument"]][:limit]
-        out.extend(message(org_id, cik, ticker.upper(), f) for f in picked)
+        filings = [f for f in await edgar.submissions(cik) if f["primaryDocument"]]  # newest first
+        for form in forms:
+            picked = [f for f in filings if f["form"] == form][:limit]
+            out.extend(message(org_id, cik, ticker.upper(), f) for f in picked)
     log.info("ingest.discovered", count=len(out), tickers=tickers, forms=forms)
     return out
 

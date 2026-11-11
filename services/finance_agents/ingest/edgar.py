@@ -14,6 +14,21 @@ from ..config import settings
 HEADERS = {"User-Agent": settings.edgar_user_agent, "Accept-Encoding": "gzip, deflate"}
 MIN_INTERVAL = 0.1  # SEC allows 10 req/s
 
+USER_AGENT_HELP = (
+    "SEC EDGAR refused the request: set EDGAR_USER_AGENT in .env to your app name plus a contact email "
+    "(for example `EDGAR_USER_AGENT=finance-agents-demo jane@yourcompany.com`), then run `make up` again."
+)
+
+
+class EdgarAccessError(RuntimeError):
+    """EDGAR answers 403 to a missing or placeholder User-Agent; retrying cannot fix it."""
+
+
+def check_user_agent() -> None:
+    if "@example.com" in settings.edgar_user_agent or "@" not in settings.edgar_user_agent:
+        raise EdgarAccessError(USER_AGENT_HELP)
+
+
 _gate = asyncio.Lock()
 _next_ok = 0.0
 _tickers: dict[str, int] = {}
@@ -28,6 +43,8 @@ async def _get(url: str) -> httpx.Response:
         _next_ok = time.monotonic() + MIN_INTERVAL
     async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
         resp = await client.get(url)
+        if resp.status_code == 403:
+            raise EdgarAccessError(USER_AGENT_HELP)
         resp.raise_for_status()
         return resp
 

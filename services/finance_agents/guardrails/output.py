@@ -1,12 +1,12 @@
-"""Deterministic output checks on the final answer: PII redaction, and `uncited` when prose carries no
-citation and is not the abstention. The Judge (agent/graph.py verify) normally prevents an uncited answer;
-this is the belt to its braces and only flags, the answer still streams."""
+"""Deterministic output checks on the final answer: PII redaction, and `uncited` when an ANSWER (reason
+`answered`) carries prose but no citation. An abstention or an action outcome has nothing to cite and is never
+flagged. The Judge (agent/graph.py verify) normally prevents an uncited answer; this is the belt to its braces
+and only flags, the answer still streams."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from ..gateway.fake import ABSTAIN_TEXT
 from .input import redact
 
 
@@ -16,7 +16,7 @@ class OutputVerdict(BaseModel):
     uncited: bool = False
 
 
-def check_output(text: str, citations_count: int) -> OutputVerdict:
+def check_output(text: str, citations_count: int, reason: str = "answered") -> OutputVerdict:
     redacted, kinds = redact(text)
-    claims = bool(redacted.strip()) and redacted.strip() != ABSTAIN_TEXT
+    claims = bool(redacted.strip()) and reason == "answered"
     return OutputVerdict(text=redacted, redactions=kinds, uncited=claims and citations_count == 0)

@@ -3,7 +3,7 @@
 There are no gold answers (ADR 0004: the corpus is live EDGAR text). What is asserted instead:
 an `answer` case produces a non-abstained, verifier-grounded answer with at least one citation, every citation
 names a document the caller may read, and at least one cites the form the case requires (`must_cite_form`);
-an `abstain` case produces the abstain text with no citations.
+an `abstain` case produces no citations, the case's `reason` and that reason's sentence.
 """
 
 from __future__ import annotations
@@ -15,7 +15,6 @@ import pytest
 pytest.importorskip("finance_agents.agent.graph")
 from corpus import DOCS_BY_ID, USERS, load_cases, may_read
 from finance_agents.agent import graph
-from finance_agents.gateway import ABSTAIN_TEXT
 
 CASES = load_cases("qa.jsonl")
 
@@ -27,10 +26,10 @@ async def test_answers_cite_readable_documents_of_the_right_form(case, audit_sin
 
     if case["expect"] == "abstain":
         assert answer.abstained is True and answer.citations == []
-        assert answer.text == ABSTAIN_TEXT
+        assert answer.reason == case["reason"] and answer.text == graph.ABSTAIN_MESSAGES[case["reason"]]
         return
 
-    assert answer.abstained is False, f"abstained: {answer.text}"
+    assert answer.abstained is False and answer.reason == "answered", f"abstained: {answer.text}"
     assert answer.citations, "a non-abstained answer must carry at least one citation"
     assert answer.verification is not None and answer.verification.grounded is True
     forms = set()

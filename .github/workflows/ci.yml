@@ -24,11 +24,11 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen --extra dev
-      - run: uv run ruff format --check services tests evals
-      - run: uv run ruff check .
-      - run: uv run mypy services/finance_agents
-      - run: uv run python -m finance_agents.ingest.cli migrate
-      - run: uv run pytest tests
+      - run: uv run --extra dev ruff format --check services tests evals
+      - run: uv run --extra dev ruff check .
+      - run: uv run --extra dev mypy services/finance_agents
+      - run: uv run --extra dev python -m finance_agents.ingest.cli migrate
+      - run: uv run --extra dev pytest  # testpaths = tests + evals/suites
 
   web:
     runs-on: ubuntu-latest

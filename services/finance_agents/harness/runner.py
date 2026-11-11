@@ -27,6 +27,7 @@ from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt,
 from ..authz import audit, get_authorizer
 from ..contracts import Principal, RiskLevel, ToolCall, ToolResult
 from ..interfaces import Authorizer
+from ..observability.otel import record_tool_span
 from .registry import ToolRegistry
 
 log = logging.getLogger(__name__)
@@ -184,4 +185,7 @@ async def _audit(
             "latency_ms": int((time.perf_counter() - started) * 1000),
         },
         thread_id,
+    )
+    record_tool_span(
+        call.tool, call.arguments, result.ok, result.error, time.perf_counter() - started, principal.user_id
     )

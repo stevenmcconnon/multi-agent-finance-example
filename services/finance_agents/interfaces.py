@@ -49,6 +49,18 @@ class Reranker(Protocol):
     async def rerank(self, query: str, chunks: list[Chunk], top_n: int) -> list[Chunk]: ...
 
 
+class ModelRefused(Exception):
+    """The model declined to answer (refusal, content filter, guardrail). The turn abstains, reason model_declined."""
+
+
+class ModelCallFailed(Exception):
+    """A model call failed at the vendor. `code` is the vendor's error code (AccessDeniedException, ...)."""
+
+    def __init__(self, message: str, code: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 class ModelGateway(Protocol):
     async def complete(
         self,

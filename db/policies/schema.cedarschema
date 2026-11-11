@@ -12,7 +12,7 @@
 // Actions:
 //   retrieve, answer         -> Document or Org
 //   tool:<name>              -> Org; read tools live under ReadTools, write/money tools under WriteTools
-namespace HarnessRag {
+namespace FinanceAgents {
   entity Org = {
     "org": String,
   };

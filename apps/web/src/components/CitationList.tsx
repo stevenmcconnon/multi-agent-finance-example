@@ -1,3 +1,4 @@
+import { sectionLabel } from "@/lib/present";
 import type { Citation } from "@/lib/schemas";
 
 export default function CitationList({ citations }: { citations: Citation[] }) {
@@ -9,7 +10,7 @@ export default function CitationList({ citations }: { citations: Citation[] }) {
           <span className="shrink-0 text-neutral-500">[{i + 1}]</span>
           <span className="min-w-0 break-words">
             <span className="font-medium">{c.title ?? c.document_id}</span>
-            {c.section && <span className="text-neutral-500"> · section: {c.section}</span>}
+            {sectionLabel(c.section) && <span className="text-neutral-500"> · section: {c.section}</span>}
             {c.version && <span className="text-neutral-500"> · version {c.version}</span>}
             {" · "}
             <a href={c.uri} target="_blank" rel="noreferrer" className="text-blue-700 underline dark:text-blue-300">
