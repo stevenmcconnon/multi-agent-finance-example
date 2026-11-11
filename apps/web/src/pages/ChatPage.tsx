@@ -4,6 +4,14 @@ import EventTimeline, { type TimelineItem } from "@/components/EventTimeline";
 import { PERSONAS, approve, errorMessage, getMe, getToken, streamChat, switchPersona } from "@/lib/api";
 
 type Turn = { question: string; items: TimelineItem[]; user: string; groups: string[] };
+// These match the quickstart corpus (AAPL 10-K, AAPL/MSFT 8-Ks, XBRL facts); change both together.
+const EXAMPLES = [
+  { q: "What risks does Apple describe about its supply chain?", path: "Document lookup in the 10-K annual report (alice answers, bob abstains)" },
+  { q: "What was AAPL revenue for the fiscal year ending September 2026?", path: "Numeric: structured facts from the filing's XBRL (eXtensible Business Reporting Language) data, cited by source row" },
+  { q: "How did AAPL net income change from fiscal 2024 to fiscal 2026?", path: "Numeric comparison across periods" },
+  { q: "What did Microsoft report in its most recent 8-K?", path: "8-K current report lookup, readable by every persona" },
+  { q: "Create a ticket to review Apple's 10-K risk section", path: "Write tool with human approval (admin only)" },
+];
 type Persona = (typeof PERSONAS)[number]["user"];
 
 export default function ChatPage() {
@@ -14,6 +22,7 @@ export default function ChatPage() {
   const [prior, setPrior] = useState<Turn | null>(null);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showExamples, setShowExamples] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -52,6 +61,12 @@ export default function ChatPage() {
     start(q, threadId, false);
   };
 
+  const tryExample = (q: string) => {
+    if (busy) return;
+    setQuestion("");
+    start(q, threadId, turns.length === 0);
+  };
+
   const reAsk = (t: Turn, user: Persona) =>
     run(async () => {
       await switchPersona(user);
@@ -82,6 +97,7 @@ export default function ChatPage() {
     setTurns([]);
     setPrior(null);
     setError(null);
+    setShowExamples(false);
   };
 
   const column = (list: Turn[], live: boolean) =>
@@ -149,6 +165,22 @@ export default function ChatPage() {
 
       {error && <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">{error}</p>}
 
+      {(turns.length === 0 || showExamples) && !prior && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">Try one of these</p>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {EXAMPLES.map((ex) => (
+              <li key={ex.q} className="min-w-0">
+                <button type="button" onClick={() => tryExample(ex.q)} disabled={busy} className="max-w-full rounded-2xl border border-blue-300 px-3 py-1 text-left text-sm text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950">
+                  {ex.q}
+                </button>
+                <p className="px-1 text-xs text-neutral-500">{ex.path}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <form onSubmit={ask} className="flex gap-2">
         <input
           value={question}
@@ -160,6 +192,11 @@ export default function ChatPage() {
         <button type="submit" disabled={busy || !question.trim()} className="rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50">
           Ask
         </button>
+        {turns.length > 0 && (
+          <button type="button" onClick={() => setShowExamples((v) => !v)} className="self-center text-sm underline">
+            Examples
+          </button>
+        )}
       </form>
     </div>
   );
