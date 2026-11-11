@@ -65,7 +65,14 @@ def worker_cmd():
 @app.command()
 def migrate():
     """Apply db/migrations in order."""
-    applied = asyncio.run(db.run_migrations())
+
+    async def _run() -> list[str]:
+        try:
+            return await db.run_migrations()
+        finally:
+            await db.close_pool()  # an open pool keeps reconnecting and the process never exits
+
+    applied = asyncio.run(_run())
     typer.echo(f"applied {applied or 'nothing (up to date)'}")
 
 
