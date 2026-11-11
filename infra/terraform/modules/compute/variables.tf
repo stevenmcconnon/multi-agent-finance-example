@@ -82,3 +82,17 @@ variable "web_origin" {
   description = "Browser origin of the UI (CloudFront URL), allowed by the API's CORS."
   type        = string
 }
+
+variable "bedrock_guardrail_id" {
+  description = "Bedrock Guardrail id (modules/guardrails); the API sends it on every Converse and ApplyGuardrail call."
+  type        = string
+}
+
+variable "bedrock_guardrail_version" {
+  type = string
+}
+
+variable "bedrock_guardrail_arn" {
+  description = "The task role may call bedrock:ApplyGuardrail on this one guardrail."
+  type        = string
+}

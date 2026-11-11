@@ -54,3 +54,7 @@ output "phoenix_url" {
 output "grafana_url" {
   value = module.observability.grafana_url
 }
+
+output "guardrail_id" {
+  value = module.guardrails.guardrail_id
+}

@@ -12,6 +12,7 @@ from typing import Any
 
 from ..config import settings
 from ..contracts import ModelRole, ModelUsage, ToolCall, ToolSpec, UnderstoodQuery
+from ..guardrails.bedrock import converse_guardrail_config
 from .fake import extract_json, plan_heuristic, understand_heuristic
 
 log = logging.getLogger(__name__)
@@ -30,6 +31,13 @@ PLAN_SYSTEM = (
 )
 
 
+def runtime_client() -> Any:
+    """The bedrock-runtime client; guardrails/bedrock.py borrows it so boto3 stays behind this door."""
+    import boto3
+
+    return boto3.client("bedrock-runtime", region_name=settings.aws_region)
+
+
 class BedrockGateway:
     def __init__(self, client: Any | None = None) -> None:
         self._client = client
@@ -41,9 +49,7 @@ class BedrockGateway:
 
     def _boto(self) -> Any:
         if self._client is None:
-            import boto3
-
-            self._client = boto3.client("bedrock-runtime", region_name=settings.aws_region)
+            self._client = runtime_client()
         return self._client
 
     async def complete(
@@ -65,6 +71,7 @@ class BedrockGateway:
             system=[{"text": system}],
             messages=[{"role": m["role"], "content": [{"text": str(m["content"])}]} for m in messages],
             inferenceConfig={"maxTokens": max_tokens, "temperature": 0},
+            **converse_guardrail_config(),
         )
         text = "".join(part.get("text", "") for part in resp["output"]["message"]["content"])
         u = resp.get("usage", {})
@@ -108,6 +115,7 @@ class BedrockGateway:
                     ]
                 },
                 inferenceConfig={"maxTokens": 1024, "temperature": 0},
+                **converse_guardrail_config(),
             )
         except Exception as exc:  # a planner outage must not kill the turn; the heuristic is the floor
             log.warning("bedrock plan failed, using heuristic: %s", exc)

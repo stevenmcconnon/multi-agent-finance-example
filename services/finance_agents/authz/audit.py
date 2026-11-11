@@ -14,20 +14,25 @@ from typing import Any
 from uuid import UUID
 
 from ..contracts import Principal
+from ..guardrails.input import redact
 
 log = logging.getLogger(__name__)
 
 AuditSink = Callable[[str, Principal | None, dict[str, Any], str | None], Awaitable[None]]
 
-AUDIT_KINDS = {"policy.decision", "retrieval", "tool.call", "model.call", "answer", "hitl", "ingest"}
+AUDIT_KINDS = {"policy.decision", "retrieval", "tool.call", "model.call", "answer", "hitl", "ingest", "guardrail"}
 
 # Test hook: when set, records go here instead of Postgres.
 AUDIT_SINK: AuditSink | None = None
 
 
 def _jsonable(value: Any) -> Any:
+    """JSON-safe, and no PII: every string passes the guardrails redactor so no e-mail, phone, SSN or card
+    lands in audit_events."""
     if isinstance(value, UUID):
         return str(value)
+    if isinstance(value, str):
+        return redact(value)[0]
     if isinstance(value, dict):
         return {k: _jsonable(v) for k, v in value.items()}
     if isinstance(value, (list, tuple, set)):

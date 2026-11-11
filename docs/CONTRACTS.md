@@ -22,6 +22,7 @@ Types: `services/finance_agents/contracts.py`. Ports: `interfaces.py`. Settings:
 - status: `{node, message}` · policy: `PolicyDecision` · retrieval: `{candidate_count, chunks:[{document_id, title, section, score}]}`
 - tool: `{tool, ok, latency_ms, from_cache, error?}` (`error` may be `forbidden`, `approval_required`, `denied`, `circuit_open`, `in_progress`) · token: `{text}` · hitl: `{tool, arguments, reason}`
 - answer: `Answer` · error: `{code, message}`
+- guardrail: `{stage: "input", injection_suspected, redactions:[kind]}` (first event of a `/chat` stream) · `{stage: "output", redactions:[kind], uncited}` (just before `answer`)
 
 ## JSON Web Token (JWT) → Principal (`harness.identity`)
 The token says WHO; the database says WHAT (groups and roles via `authz.group_cache.resolve_from_db`; token groups are a hint only). `exp` is REQUIRED in both modes; a missing or past `exp` is a 401.
@@ -53,3 +54,6 @@ One LangGraph graph is the **Supervisor**: deterministic routing between special
 | Writer | model (non-deterministic) | grounded draft from the evidence only, cites by index | `generate` |
 | Judge | model (non-deterministic, second cheaper model) | verifies every claim against the evidence; one retry, then abstain | `verify` |
 `status` TurnEvents carry `{node, agent, kind: "deterministic"|"model"|"human", message}`. Node names stay (`understand`, `policy`, `plan`, `act`, `generate`, `verify`, `answer`); `agent` is the team member acting in that node.
+
+## Guardrails (pinned 2026-11-11)
+`guardrails/` is a belt to the policy layer's braces, never a replacement: `check_input` runs before `graph.stream_turn` (hard failures are 422 `{reasons}`; personally identifiable information (PII) is redacted to `[redacted-<kind>]` in the question the graph sees, a prompt-injection match is tagged, not blocked), `check_output` runs on the final `answer` (text redacted, `uncited` flagged), and `authz.audit._jsonable` redacts every string so no PII lands in `audit_events`. `POST /chat` and `POST /chat/{id}/approve` return 429 with `Retry-After` past `HR_RATE_LIMIT_PER_MINUTE` per principal (Redis key `hr:rl:<org>:<user>:<minute>`; Redis down = allow). Audit kind `guardrail` records one row per turn with the input verdict. When `BEDROCK_GUARDRAIL_ID` is set, every Converse call carries `guardrailConfig` and `ApplyGuardrail` runs on the question and the answer. Table of every guardrail: `docs/GUARDRAILS.md`.

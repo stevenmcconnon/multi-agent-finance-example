@@ -22,6 +22,8 @@ locals {
     { name = "BEDROCK_RERANK_MODEL", value = var.model_ids.rerank },
     { name = "HR_EMBED_BACKEND", value = "bedrock" },
     { name = "HR_RERANK_BACKEND", value = "bedrock" },
+    { name = "BEDROCK_GUARDRAIL_ID", value = var.bedrock_guardrail_id },
+    { name = "BEDROCK_GUARDRAIL_VERSION", value = var.bedrock_guardrail_version },
     { name = "REDIS_URL", value = var.redis_url },
     { name = "TEMPORAL_ADDRESS", value = "temporal:7233" },
     { name = "TEMPORAL_NAMESPACE", value = "default" },
@@ -94,7 +96,7 @@ resource "aws_iam_role_policy" "execution_secret" {
   })
 }
 
-# Task role for api + ingest-worker: only the four models, the one policy store, the one secret.
+# Task role for api + ingest-worker: only the four models, the one guardrail, the one policy store, the one secret.
 resource "aws_iam_role" "app" {
   name               = "${var.project}-app"
   assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
@@ -109,6 +111,11 @@ resource "aws_iam_role_policy" "app" {
         Effect   = "Allow"
         Action   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
         Resource = local.model_arns
+      },
+      {
+        Effect   = "Allow"
+        Action   = "bedrock:ApplyGuardrail" # Converse with guardrailConfig needs it too
+        Resource = var.bedrock_guardrail_arn
       },
       {
         Effect   = "Allow"

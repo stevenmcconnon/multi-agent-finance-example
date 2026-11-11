@@ -174,5 +174,5 @@ class Answer(BaseModel):
 class TurnEvent(BaseModel):
     """SSE event emitted to the UI."""
 
-    type: Literal["status", "policy", "retrieval", "tool", "token", "hitl", "answer", "error"]
+    type: Literal["status", "policy", "retrieval", "tool", "token", "hitl", "answer", "error", "guardrail"]
     data: dict[str, Any] = Field(default_factory=dict)

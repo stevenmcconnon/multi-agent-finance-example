@@ -42,5 +42,9 @@ class Settings(BaseSettings):
     hr_turn_tool_call_budget: int = 8
     hr_turn_timeout_seconds: int = 60
 
+    bedrock_guardrail_id: str = ""  # empty = Bedrock Guardrails off (local demo)
+    bedrock_guardrail_version: str = "DRAFT"
+    hr_rate_limit_per_minute: int = 30
+
 
 settings = Settings()

@@ -40,6 +40,11 @@ module "policy" {
   policies_dir = "${path.root}/../../../../db/policies"
 }
 
+module "guardrails" {
+  source  = "../../modules/guardrails"
+  project = var.project
+}
+
 module "observability" {
   source           = "../../modules/observability"
   project          = var.project
@@ -67,6 +72,9 @@ module "compute" {
   avp_policy_store_id       = module.policy.policy_store_id
   avp_policy_store_arn      = module.policy.policy_store_arn
   model_ids                 = var.model_ids
+  bedrock_guardrail_id      = module.guardrails.guardrail_id
+  bedrock_guardrail_version = module.guardrails.guardrail_version
+  bedrock_guardrail_arn     = module.guardrails.guardrail_arn
   web_origin                = module.web.url
   extra_api_containers      = [module.observability.adot_container]
 }
