@@ -57,3 +57,28 @@ One LangGraph graph is the **Supervisor**: deterministic routing between special
 
 ## Guardrails (pinned 2026-11-11)
 `guardrails/` is a belt to the policy layer's braces, never a replacement: `check_input` runs before `graph.stream_turn` (hard failures are 422 `{reasons}`; personally identifiable information (PII) is redacted to `[redacted-<kind>]` in the question the graph sees, a prompt-injection match is tagged, not blocked), `check_output` runs on the final `answer` (text redacted, `uncited` flagged), and `authz.audit._jsonable` redacts every string so no PII lands in `audit_events`. `POST /chat` and `POST /chat/{id}/approve` return 429 with `Retry-After` past `HR_RATE_LIMIT_PER_MINUTE` per principal (Redis key `hr:rl:<org>:<user>:<minute>`; Redis down = allow). Audit kind `guardrail` records one row per turn with the input verdict. When `BEDROCK_GUARDRAIL_ID` is set, every Converse call carries `guardrailConfig` and `ApplyGuardrail` runs on the question and the answer. Table of every guardrail: `docs/GUARDRAILS.md`.
+
+## Demo-hardening decisions (pinned 2026-11-11)
+
+**`GET /config`** (no auth) → `{"model_backend": "fake"|"bedrock", "models": {"generate": str, "verify": str, "embed": str, "rerank": str}, "auth_mode": "local"|"cognito"}`. The web app shows it so nobody mistakes the offline stub for a language model.
+
+**`Answer.reason`** (new field, string, always set): `answered` · `no_relevant_evidence` (the reader's permitted documents do not answer it, or the reader has none) · `out_of_scope` · `policy_denied` · `not_grounded` · `action_done` · `action_denied` (the human said no) · `action_forbidden` (the caller's role may not use the tool). `Answer.text` carries a sentence a person can read for each; the web headline is chosen from `reason`.
+
+**Numeric questions.** Structured facts are the evidence. When `facts_sql` returns rows for a numeric question the document search is skipped; with no rows the search runs as the fallback. Years named in the question filter the facts by fiscal year. For exactly two periods of one concept the Researcher runs the `calculator` tool and adds the change (absolute and percent) as its own evidence line.
+
+**Thread ownership in the UI.** Switching persona always starts a new thread (a thread belongs to the principal who opened it; the API answers 403 otherwise).
+
+**Retrieval event wording.** Every candidate already passed the permission filter in SQL. `candidate_count` = authorized candidates; `chunks` = what the reranker kept above the relevance floor.
+
+**Demo corpus (pinned).** `make ingest` loads a fixed manifest, not "the newest filings", so the example questions keep working: AAPL 10-K `0000320193-26-000026`, MSFT 10-K `0001193125-26-323660`, AAPL 8-K `0001140361-26-042798` (notes issuance), MSFT 8-K `0001193125-26-447173` (notes issuance), MSFT 8-K `0001193125-26-448357` (a director not standing for re-election). `cli run --tickers ... --forms ... --limit N` still ingests the newest N filings **per form** per ticker.
+
+**Example questions (web chips, DEMO.md, tests all use these exact strings).**
+1. `What risks does Apple describe about its supply chain?`: 10-K lookup; alice answers, bob abstains.
+2. `What was Apple's revenue in fiscal 2026?`: facts table; one figure, cited to the XBRL fact.
+3. `How did Apple's net income change from fiscal 2024 to fiscal 2026?`: two facts plus the calculator.
+4. `Which Microsoft director is not standing for re-election?`: 8-K lookup; alice and bob both answer.
+5. `Create a ticket to review Apple's 10-K risk section`: write tool; carol gets the approval card, alice and bob are told their role may not.
+
+**Personas.** alice: analyst, reads 10-K and 8-K. bob: viewer, reads 8-K only. carol: operations admin, may run write tools after approval, belongs to no reader group and so reads no filings (separation of duties; say so wherever carol is introduced).
+
+**Bedrock models (cloud mode).** Generation and planning `us.anthropic.claude-sonnet-5-5`, verification and classification `us.anthropic.claude-haiku-5-5` (inference profile ids; the bare model ids cannot be invoked on demand). No `temperature`/`top_p`. Thinking is always on, so output caps leave room for it and text is read from `text` blocks only.
