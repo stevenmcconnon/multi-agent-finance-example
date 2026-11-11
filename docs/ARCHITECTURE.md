@@ -82,7 +82,26 @@ tool calls and wall clock per turn and raises `BudgetExceeded`.
 
 ### L6 Orchestration (`agent/graph.py`)
 
-One LangGraph `StateGraph` per turn: `understand -> policy -> plan -> act -> generate -> verify -> answer |
+One LangGraph `StateGraph` per turn is the **Supervisor**: deterministic routing between the agents of the
+team pinned in [CONTRACTS.md](CONTRACTS.md) "The agent team". The node names are unchanged; each node is one
+team member acting, and the `status` event carries `{node, agent, kind}`:
+
+| Node | Agent | Kind |
+|---|---|---|
+| `understand` | Planner | model |
+| `policy` | Guard | deterministic |
+| `plan` | Planner | model |
+| `act` | Researcher, and the Approver (human) when `interrupt()` parks a write or money call | deterministic / human |
+| `generate` | Writer | model |
+| `verify` | Judge (the second, cheaper model) | model |
+| `answer`, `abstain` | Supervisor | deterministic |
+
+    In production: a model-driven supervisor with handoffs and a re-plan loop after evidence arrives
+    (`plan()` already takes `evidence_summary`; the graph passes `None`); a research sub-loop under the same
+    `run_tool` door; approvals routed to Slack or Teams; multi-day human waits in Temporal.
+    In this demo: fixed edges and one pass, because one question per turn is provable and replayable.
+
+The turn is `understand -> policy -> plan -> act -> generate -> verify -> answer |
 abstain`. `plan` asks the model for tool calls through Bedrock Converse native tool use and shows it only
 `registry.specs_for(principal)`; `act` runs each chosen call through `harness.runner.run_tool` (Cedar,
 idempotency, retries, breaker, audit) and, before a write or money call runs, parks the thread with `interrupt()` inside `act` itself (there is no

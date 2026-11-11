@@ -1,34 +1,171 @@
 # harness-rag
 
-Permission-safe enterprise retrieval-augmented generation (RAG) and an artificial intelligence (AI) harness for agents that take action, on Amazon Web Services (AWS).
+An artificial intelligence (AI) assistant over real company filings that only answers from what you are allowed to see, cites every answer, and asks a human before it acts.
 
 [![ci](https://github.com/stevenmcconnon/harness-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/stevenmcconnon/harness-rag/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB.svg)](pyproject.toml)
 [![terraform](https://img.shields.io/badge/terraform-1.6-7B42BC.svg)](infra/terraform)
 
-harness-rag answers questions over documents that carry item-level permissions, and lets an agent call
-tools that change things, without ever showing a user a chunk they may not read or running a write nobody
-approved. Identity comes from a verified token, authorization from Cedar policies, the permission filter is
-a Structured Query Language (SQL) predicate inside every candidate query, and every tool call passes through one guarded door.
+## What this is
 
-The corpus is public filings from the U.S. Securities and Exchange Commission (SEC) Electronic Data Gathering, Analysis, and Retrieval system (EDGAR): Form 10-K (annual report), Form 10-Q (quarterly report) and Form 8-K (current report), with simulated item-level access control lists (ACLs), standing in for a
-SharePoint library with Microsoft Graph permissions: the filings are public, the ACLs are the demo's own
-(`ingest/acl.py`), and nothing in the retrieval or policy path knows the difference. Three seeded identities
-make the behaviour visible: **alice** (analyst; groups finance, analysts) reads 10-K/10-Q and 8-K,
-**bob** (viewer; engineering) reads 8-K only, **carol** (admin) may call write tools but belongs to no reader
-group.
+harness-rag is a working demo of an AI assistant for a company's document library. The documents here
+are real: the annual and quarterly reports that every public company in the United States must file with
+the Securities and Exchange Commission (SEC), for Apple and Microsoft. You sign in as one of three example
+employees, ask questions in plain English, and get answers with links to the exact pages they came from.
 
-It demonstrates the full stack of such a system in one repository: Terraform for Amazon Elastic Container Service (ECS) Fargate, Amazon Relational Database Service (RDS),
-Cognito, Verified Permissions and Bedrock; a Temporal ingestion pipeline; hybrid pgvector + full-text
-retrieval with reciprocal rank fusion (RRF) and reranking; a LangGraph turn with a second-model verifier, human-in-the-loop (HITL)
-interrupts and checkpoint replay; a React (Vite) single-page application (SPA) and a Model Context Protocol (MCP) server over the same tools. Where the demo
-takes a cheaper path than production, the code and the docs say so in the same two-line form
-([Production vs this demo](#production-vs-this-demo)).
+Three things make it different from a chatbot pointed at a folder. First, each person only ever gets
+answers from the documents they are allowed to read; the assistant will say it cannot answer rather than
+peek at a report you have no access to. Second, numbers such as revenue come from the structured data
+tables inside the filings, never from the model's memory. Third, when the assistant wants to do something
+rather than say something, such as opening a ticket, a person has to approve it first, and every step is
+recorded so you can replay exactly what happened.
+
+Under the hood this is a reference implementation of the plumbing a business needs before it can let an AI
+agent loose on private data: identity, permissions, approvals, audit and replay, built on Amazon Web
+Services (AWS) and the same open-source tools a production team would use. The author built it as a worked
+example of the seven-layer architecture he uses for such systems (cloud, data, models, retrieval, harness,
+orchestration, experience), with every layer in one repository and a local mode that runs for $0.
+
+Why the problem exists: enterprise document stores (SharePoint, Confluence, shared drives) carry
+permissions per item. A retrieval-augmented generation (RAG) system that ignores them leaks a paragraph
+from a file the reader could never open, and an agent that can act needs a gate a human controls. SEC
+filings stand in for the SharePoint library because they are public, free, versioned and carry numeric
+tables; the access control lists (ACLs) are simulated (`ingest/acl.py`, by form type), and nothing in the
+retrieval or policy path knows the difference. It is for engineers evaluating how to run agents in
+production. Where the demo takes a cheaper path than production, the code and the docs say so in the same
+two-line form ([Production vs this demo](#production-vs-this-demo)).
+
+## What you will see
+
+Three seeded identities make the behaviour visible: **alice** (analyst; groups finance, analysts) reads
+Form 10-K (annual report), 10-Q (quarterly report) and 8-K (current report) filings; **bob** (viewer;
+engineering) reads 8-Ks only; **carol** (admin) may call write tools but belongs to no reader group.
+The chat page offers these prompts ([screenshot](docs/screenshots/11-examples.png)).
+
+1. **Sign in as alice, ask about Apple's supply chain.** The answer cites the 10-K, and the timeline shows
+   each step: the policy decision, the plan, the tool call, the chunks retrieved, the verifier's verdict
+   ([screenshot](docs/screenshots/02-alice-chat.png)). Proves: a grounded, cited answer with the whole turn visible.
+2. **Re-ask as bob.** Same question, second column: bob abstains, because his permissions reach only the
+   8-Ks and the 8-Ks do not answer it ([screenshot](docs/screenshots/10-persona-compare.png),
+   [bob alone](docs/screenshots/05-bob-chat.png)). Proves: the 10-K never entered the prompt, the reranker
+   or the audit row for bob.
+3. **Ask a revenue question.** The number comes from the eXtensible Business Reporting Language (XBRL) facts
+   table, cited to its source row, never from prose. Proves: a figure is read, not generated.
+4. **As carol, create a ticket.** The run pauses at an approval card; Deny changes nothing, Approve runs the
+   tool exactly once ([card](docs/screenshots/07-carol-hitl.png), [after approval](docs/screenshots/08-carol-approved.png)).
+   Proves: a write needs a human, and the same approval cannot run it twice.
+5. **Open Replay and Documents.** Replay lists the checkpoint each node wrote
+   ([screenshot](docs/screenshots/04-replay.png)); Documents lists what the signed-in user may read, from the
+   same Structured Query Language (SQL) predicate retrieval uses
+   ([alice](docs/screenshots/03-alice-documents.png), [bob](docs/screenshots/06-bob-documents.png)).
+   Proves: every step is recorded and the permissions are server-side.
+
+The scripted version with what to say at each step: [docs/DEMO.md](docs/DEMO.md).
+
+## Run it yourself
+
+About 10 minutes, $0. Nothing calls AWS; the model gateway is a deterministic fake and the embedding and
+reranking models run locally.
+
+**Prerequisites:** Docker (with Compose), and a contact e-mail: SEC's Electronic Data Gathering, Analysis,
+and Retrieval system (EDGAR) answers 403 to a request without an app name and e-mail in its `User-Agent`.
+
+```sh
+cp .env.example .env
+# edit this line in .env:  EDGAR_USER_AGENT=harness-rag you@example.com
+make up        # builds and starts everything (first run downloads images and models)
+make ingest    # AAPL and MSFT, 10-K and 8-K, newest 2 each, run inline inside the api container
+```
+
+`make up` starts: Postgres with pgvector (`:5432`), Valkey (`:6379`), the Temporal dev server (`:7233`,
+UI `:8233`), Phoenix traces (`:6006`), the OpenTelemetry collector (`:4318`), the API (`:8000`) and the web
+app (`:3000`). The API container applies `db/migrations` (0002 seeds the org `acme` and alice, bob, carol)
+before it serves. If port 3000 is taken: `WEB_PORT=3100 make up`.
+
+Open http://localhost:3000 and walk the five steps. Sign-in is a persona picker (local mode only); once in,
+the header has a persona switcher.
+
+- [ ] Pick **alice**; ask `What risks does Apple describe about its supply chain?`
+- [ ] Under the answer click **Re-ask as bob**; read the abstention in the second column
+- [ ] Ask `What was AAPL revenue for the fiscal year ending September 2026?`; the citation is a facts row
+- [ ] Switch to **carol**; ask `Create a ticket to review Apple's 10-K risk section`; click Deny, ask again, Approve
+- [ ] Click **Replay this turn**; open **Documents** as alice, then as bob
+
+Same tools over the Model Context Protocol (MCP), same door (needs `uv`):
+`HR_TOKEN=$(uv run python -m harness_rag.harness.devtoken alice) uv run python -m harness_rag.mcp_server.server`.
+Write tools are listed for an admin but answer `approval_required`: approval happens only in the UI.
+
+## The agent team
+
+One LangGraph graph is the **Supervisor**: deterministic routing between specialized agents, checkpointed
+and replayable. The node names are unchanged from the single-graph design (`understand`, `policy`, `plan`,
+`act`, `generate`, `verify`, `answer`); each node is one team member acting, and the `status` event names
+it (`{node, agent, kind}`). Pinned in [docs/CONTRACTS.md](docs/CONTRACTS.md) "The agent team".
+
+![A live alice turn with every timeline row labelled by agent and badged deterministic or model](docs/screenshots/12-agent-team.png)
+
+| Agent | Kind | Owns | Model role |
+|---|---|---|---|
+| Supervisor | deterministic | the graph: fixed edges, routing on state, one checkpoint per node, `answer` / `abstain` | none |
+| Guard | deterministic | identity → Principal, Cedar `answer` decision, fail closed | none |
+| Planner | model (non-deterministic) | understands the question, chooses tools from `registry.specs_for(principal)` via Bedrock Converse tool use | `understand`, `plan` |
+| Researcher | deterministic | runs the planned calls through `harness.runner.run_tool`, assembles evidence (facts first, then chunks), relevance floor | none |
+| Approver | human | approves or denies write/money tools through the interrupt | none |
+| Writer | model (non-deterministic) | grounded draft from the evidence only, cites by index | `generate` |
+| Judge | model (non-deterministic, second cheaper model) | verifies every claim against the evidence; one retry, then abstain | `verify` |
+
+In production: a model-driven supervisor with handoffs and a re-plan loop once evidence arrives (`plan()`
+already takes an `evidence_summary`; the graph passes `None` today). In this demo: fixed edges, because the
+task is one question and fixed edges are provable and replayable.
+
+```mermaid
+flowchart LR
+    U([user question]) --> understand
+    understand["understand<br/>Planner"]:::model --> policy["policy<br/>Guard: Cedar answer?"]:::det
+    policy -->|deny| abstain:::det
+    policy -->|allow| plan["plan<br/>Planner: choose tools from specs_for(principal)"]:::model
+    plan -->|nothing planned| abstain
+    plan --> act["act<br/>Researcher: run_tool (Cedar, idempotency, breaker, audit)"]:::det
+    act -. write or money tool .-> approve{{"interrupt<br/>Approver (human)"}}:::human
+    approve -->|approve| act
+    approve -->|deny| answer
+    act -->|no authorized evidence| abstain
+    act --> generate["generate<br/>Writer: draft from evidence only"]:::model
+    generate --> verify["verify<br/>Judge: every claim against the evidence"]:::model
+    verify -->|grounded| answer["answer<br/>Supervisor"]:::det
+    verify -->|unsupported claims, first time| generate
+    verify -->|still ungrounded| abstain["abstain<br/>Supervisor"]:::det
+    classDef det fill:#1d4ed8,color:#fff,stroke:#1e3a8a
+    classDef model fill:#be123c,color:#fff,stroke:#881337
+    classDef human fill:#b45309,color:#fff,stroke:#78350f
+```
+
+Blue nodes are deterministic, red nodes are model calls, the orange one is a person. The deterministic
+parts are everything that must be provable: identity resolution, the Cedar decision, the SQL ACL filter,
+reciprocal rank fusion, the facts table and the calculator, turn budgets, circuit breakers and idempotency.
+The non-deterministic parts are the four model calls (understand, plan, generate, verify), and each sits
+between a deterministic gate before it (policy, `specs_for`, the ACL-filtered evidence) and after it (the
+Cedar check in `run_tool`, the verifier's JSON parsed into `Verification`, the citation map). A model call
+can therefore change *which authorized evidence* ranks first and *how the answer reads*, never *who sees
+what* or *what runs*. Two orchestrators at two grains: LangGraph runs the turn (seconds, checkpointed,
+resumable after a human), Temporal runs ingestion (minutes to hours, retried with backoff, dead-lettered);
+neither is used for the other's job. Architecture decision record (ADR)
+[0008](docs/adr/0008-model-driven-tool-selection.md) covers the model-driven plan.
 
 ## The stack
 
-![Seven layers: cloud, data, models, retrieval, harness, orchestration, experience](docs/diagrams/stack.svg)
+![Seven layers, each with its folder, what the local demo runs and what cloud mode runs](docs/diagrams/stack.svg)
+
+| Layer | Folder | Role |
+|---|---|---|
+| L7 Experience | `apps/web`, `services/harness_rag/api`, `services/harness_rag/mcp_server` | React (Vite) single-page application (SPA); FastAPI streaming server-sent events (SSE); MCP server over the same tools |
+| L6 Orchestration | `services/harness_rag/agent`, `ingest/workflow.py` | `graph.py` (the Supervisor graph, LangGraph); the Temporal ingestion workflow |
+| L5 AI Harness | `services/harness_rag/harness` | `identity.py`, `registry.py`, `runner.py` (the one tool door), `budget.py`, `tools/` |
+| L4 Knowledge / Retrieval | `services/harness_rag/retrieval`, `services/harness_rag/authz` | `sql.py` (the predicate), `hybrid.py`, `facts.py`; `cedar_local.py`, `group_cache.py`, `audit.py` |
+| L3 Models | `services/harness_rag/gateway`, `retrieval/embed.py`, `retrieval/rerank.py` | `bedrock.py`, `fake.py`; the only modules that speak to a model vendor |
+| L2 Data / Pipelines | `services/harness_rag/ingest` | `edgar.py`, `parse.py`, `facts.py`, `writer.py` (one transaction per filing) |
+| L1 Cloud / Platform | `infra/terraform`, `infra/otel`, `infra/grafana`, `services/harness_rag/observability` | `envs/dev/main.tf`; collector config; `otel.py` |
 
 Deeper: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · code walk: [docs/TOUR.md](docs/TOUR.md) ·
 threat model: [docs/SECURITY.md](docs/SECURITY.md) · demo script: [docs/DEMO.md](docs/DEMO.md).
@@ -46,7 +183,7 @@ that could break it has one owner and one test.
 | The prompt | `agent/graph.py` `_evidence` builds the model's evidence only from `state["chunks"]`/`state["facts"]`, which only `harness.runner.run_tool` fills; `harness/tools/search_documents.py` refuses a result whose `acl_filtered` is not `True`; with no evidence the model is not called | `tests/test_agent.py::test_zero_authorized_chunks_abstains_without_calling_the_model`; `evals/suites/test_permission_leak.py` |
 | Identity | `harness/identity.py` `verify_token`: signature and `exp` (required) checked; Cognito mode takes the user from `cognito:username` and the org from the one `org:<slug>` group; groups and roles come from the database through `authz/group_cache.py`, never from the token's hint or the prompt; `authz/entities.py` drops unknown roles; `check_config()` refuses to boot `HR_MODE=aws` on local JSON Web Token (JWT) settings | `tests/test_identity.py` (`test_cognito_token_groups_are_only_a_hint`, `test_local_missing_exp_rejected`, `test_cognito_missing_exp_rejected`, `test_check_config_refuses_aws_with_local_jwt`); `tests/test_authz.py::test_prompt_cannot_grant_roles`; `evals/datasets/permission_leak.jsonl` `bob-prompt-injection` |
 | Caches | `authz/group_cache.py` caches principal resolution (a denial too), never documents; `harness/runner.py` checks Cedar and the risk gate before it reserves an idempotency key (`org:tool:<call key>`) and stores only authorized results | `tests/test_authz.py::test_group_cache_caches_denial_and_survives_redis_failure`; `tests/test_harness.py::test_idempotent_second_call_is_cached`, `::test_idempotency_key_distinguishes_arguments`, `::test_concurrent_same_key_runs_the_tool_once` |
-| Writes | `harness/runner.py` `run_tool`: a `write` or `money` tool returns `approval_required` unless the caller passes `approved=True`, which only the graph's HITL path does after a human approves; MCP and the application programming interface (API) never pass it | `tests/test_harness.py::test_write_tool_needs_explicit_approval`; `tests/test_mcp.py::test_carol_write_tool_over_mcp_needs_approval`; `tests/test_agent.py::test_create_ticket_declined_changes_nothing` |
+| Writes | `harness/runner.py` `run_tool`: a `write` or `money` tool returns `approval_required` unless the caller passes `approved=True`, which only the graph's human-in-the-loop (HITL) path does after a human approves; MCP and the application programming interface (API) never pass it | `tests/test_harness.py::test_write_tool_needs_explicit_approval`; `tests/test_mcp.py::test_carol_write_tool_over_mcp_needs_approval`; `tests/test_agent.py::test_create_ticket_declined_changes_nothing` |
 | Irrelevant but readable evidence | `retrieval/hybrid.py` drops reranked chunks scoring below the reranker's own floor (`Reranker.min_score`; `HR_RERANK_MIN_SCORE` overrides), so a reader whose permitted documents do not answer the question gets an abstention | `tests/test_retrieval.py::test_rerank_floor_drops_irrelevant_authorized_chunks` |
 | Logs and audit | `authz/audit.py` `record`: the `retrieval` row (`hybrid.py`) lists the document ids of the chunks returned after the predicate, nothing earlier | `evals/suites/test_permission_leak.py` walks every audit row and stream event for a forbidden id |
 | Eval datasets | `evals/ragas_eval.py` `cited_contexts` reads back only chunk ids the turn cited for that principal | `evals/suites/test_citation_quality.py` (every citation readable by the asking user) |
@@ -61,10 +198,10 @@ sequenceDiagram
     autonumber
     participant W as React SPA
     participant A as FastAPI (api/app.py)
-    participant I as identity.verify_token
-    participant G as LangGraph (agent/graph.py)
-    participant C as Cedar (authz/)
-    participant R as run_tool (harness/runner.py)
+    participant I as Guard: identity.verify_token
+    participant G as Supervisor graph (agent/graph.py)
+    participant C as Guard: Cedar (authz/)
+    participant R as Researcher: run_tool (harness/runner.py)
     participant P as Postgres (pgvector + tsvector)
     participant M as Model gateway (gateway/)
     W->>A: POST /chat {question, thread_id} + Bearer JWT
@@ -72,71 +209,34 @@ sequenceDiagram
     I->>P: groups and roles for (org, sub) via Redis-cached resolver
     I-->>A: Principal
     A->>G: stream_turn(principal, question, thread_id)
-    G->>M: understand(question) -> intent, entities
+    G->>M: Planner: understand(question) -> intent, entities
     G->>C: decide(principal, "answer", Org::<org>)
     C-->>G: PolicyDecision (audited)
-    G->>M: plan(question, registry.specs_for(principal)) -> tool calls
+    G->>M: Planner: plan(question, registry.specs_for(principal)) -> tool calls
     G->>R: search_documents (and facts_sql when numeric)
     R->>C: decide(principal, "tool:<name>", Org::<org>)
     R->>P: DENSE_SQL and SPARSE_SQL, ACL predicate in WHERE
     P-->>R: authorized candidates only
     R->>R: RRF fuse, rerank, drop below the relevance floor, audit "retrieval"
     R-->>G: chunks, citations (acl_filtered = true)
-    G->>M: generate(evidence, question)
-    G->>M: verify(answer, evidence) with the second model
+    G->>M: Writer: generate(evidence, question)
+    G->>M: Judge: verify(answer, evidence) with the second model
     G-->>A: TurnEvents (status, policy, tool, retrieval, token, answer)
-    A-->>W: Server-sent events (SSE) stream, one Postgres checkpoint per node
+    A-->>W: SSE stream, one Postgres checkpoint per node
 ```
 
-## The agent
-
-The turn is `understand -> policy -> plan -> act -> generate -> verify -> answer | abstain`
-(`agent/graph.py`). `plan` asks the model to choose tools through Bedrock Converse native tool use, but it
-only ever sees `registry.specs_for(principal)`; with `HR_MODEL_BACKEND=fake` the plan is a deterministic
-heuristic. `act` runs every chosen call through `harness/runner.py` (Cedar, risk gate, idempotency,
-timeout, retries, breaker, audit). The HITL `interrupt()` sits inside `act`, before a write or money call
-runs, and `approve()` resumes it (architecture decision record [ADR 0008](docs/adr/0008-model-driven-tool-selection.md)).
-
-```mermaid
-stateDiagram-v2
-    [*] --> understand
-    understand --> policy
-    policy --> abstain: policy denied
-    policy --> plan
-    plan --> abstain: out of scope, nothing planned
-    plan --> act: tool calls from specs_for(principal)
-    state act {
-        [*] --> approvals
-        approvals --> approvals: write / money call: interrupt() until approve()
-        approvals --> run_tool: read calls, or a human said yes
-        run_tool --> [*]: Cedar, risk gate, idempotency, breaker, audit
-    }
-    act --> generate: evidence from tool results
-    act --> [*]: a write outcome is the whole answer
-    generate --> verify: draft
-    generate --> abstain: no authorized evidence (model not called)
-    verify --> answer: grounded
-    verify --> generate: unsupported claims, attempts < 2
-    verify --> abstain: still ungrounded
-    answer --> [*]
-    abstain --> [*]
-```
-
-Two orchestrators at two grains: LangGraph runs the turn (seconds, checkpointed, replayable, resumable
-after a human), Temporal runs ingestion (minutes to hours, retried with backoff, dead-lettered). And a
-deterministic / non-deterministic split: identity, policy, the SQL ACL filter, fusion, the facts table and
-calculator, budgets and breakers are deterministic; only the four model calls (understand, plan, generate,
-verify) are not, and each sits between a deterministic gate before it and after it.
+The human-in-the-loop `interrupt()` sits inside `act`, before a write or money call runs, and `approve()`
+resumes it. With `HR_MODEL_BACKEND=fake` the plan is a deterministic heuristic.
 
 ## Ingestion
 
 ```mermaid
 flowchart LR
-    E[SEC EDGAR\nsubmissions + companyfacts JavaScript Object Notation (JSON)\nUser-Agent from EDGAR_USER_AGENT] --> D[DiscoverWorkflow\nnewest N filings per ticker]
+    E[SEC EDGAR\nsubmissions + companyfacts JSON\nUser-Agent from EDGAR_USER_AGENT] --> D[DiscoverWorkflow\nnewest N filings per ticker]
     D -->|one child workflow per filing\nid = idempotency key| F[IngestFilingWorkflow]
     F --> C1[claim\ningest_jobs row]
     C1 --> C2[fetch\noriginal to S3 or data/edgar]
-    C2 --> C3[parse_and_write\nparse.py sections, chunk 700/80 words\nfacts.py eXtensible Business Reporting Language (XBRL) facts for this accession\nembed 512-dim\nwriter.py one transaction]
+    C2 --> C3[parse_and_write\nparse.py sections, chunk 700/80 words\nfacts.py XBRL facts for this accession\nembed 512-dim\nwriter.py one transaction]
     C3 --> C4[finish]
     C4 --> P[(Postgres\ndocuments, document_acl, chunks, facts)]
     F -.->|5th failure| X[ingest_jobs.status = dead]
@@ -144,8 +244,8 @@ flowchart LR
 
 Retries, backoff and the dead letter are Temporal's and the `ingest_jobs` table's; there is no queue
 service in the path ([ADR 0003](docs/adr/0003-temporal-owns-ingestion-durability.md) says when one would be
-the better answer). The same activities run inline without Temporal (`cli run --inline`), which is how the
-local quickstart ingests.
+the better answer). The same activities run inline without Temporal (`cli run --inline`), which is how
+`make ingest` works. JSON is JavaScript Object Notation.
 
 ## AWS deployment
 
@@ -155,41 +255,6 @@ Terraform lives in `infra/terraform` (modules `network`, `database`, `cache`, `w
 `observability`, `compute`, `schedule`; environment `envs/dev`). The Cedar policies in `db/policies` are the
 same files `modules/policy` uploads to the Verified Permissions store, so switching `HR_AUTHZ_BACKEND`
 changes where Cedar runs, not what it decides.
-
-## Quickstart (local, $0)
-
-Requires Docker, `uv`, and `pnpm`. Nothing calls AWS; models are the fake gateway and local Open Neural Network Exchange (ONNX) models.
-
-```sh
-cp .env.example .env
-# EDGAR answers 403 without an app name and a contact e-mail in the User-Agent: edit this line.
-#   EDGAR_USER_AGENT=harness-rag you@example.com
-make up            # Postgres (pgvector), Valkey, Temporal dev server, Phoenix, OTel collector, api, web; the api container applies db/migrations (0002 seeds acme, alice, bob, carol) before it serves
-make ingest        # AAPL and MSFT, 10-K and 8-K, newest 2 each, inline (no Temporal needed for this)
-```
-
-The web app is at http://localhost:3000, the API at http://localhost:8000, Temporal user interface (UI) at :8233, Phoenix
-traces at :6006. Sign-in is a persona picker (local mode only); once in, the header has a persona switcher.
-
-1. Pick **alice** ([sign-in](docs/screenshots/01-signin.png)) and ask:
-   `What risks does Apple describe about its supply chain?` The timeline shows `policy`, `plan`, `tool`,
-   `retrieval` (candidate count and the chunks' sections), `token`, `answer` with citations into the 10-K
-   ([screenshot](docs/screenshots/02-alice-chat.png)).
-2. Under the answer, click **Re-ask as bob**. The same question runs as bob in a second column
-   ([screenshot](docs/screenshots/10-persona-compare.png)). bob may read the 8-Ks only, and they do not
-   answer it, so the turn abstains: *I can't answer that from the documents you have access to.* Nothing
-   from the 10-K entered the prompt, the reranker or the audit row.
-3. Open **Documents** as each: alice sees the 10-K and the 8-Ks, bob the 8-Ks
-   ([alice](docs/screenshots/03-alice-documents.png), [bob](docs/screenshots/06-bob-documents.png)).
-4. Click **Replay this turn**: the checkpoints the Postgres saver wrote, one per node, oldest first
-   ([screenshot](docs/screenshots/04-replay.png)).
-5. Switch to **carol** and ask `Create ticket: follow up on AAPL risk factors`. The turn stops at an
-   approval card ([screenshot](docs/screenshots/07-carol-hitl.png)); Deny and nothing is created, Approve
-   and the tool runs once under an idempotency key.
-
-Same tools over MCP, same door:
-`HR_TOKEN=$(uv run python -m harness_rag.harness.devtoken alice) uv run python -m harness_rag.mcp_server.server`.
-Write tools are listed for an admin but answer `approval_required`: approval happens only in the UI.
 
 ## Deploy to AWS
 
@@ -206,31 +271,36 @@ nothing there was metered from a live run). `.github/workflows/deploy.yml` build
 
 ## Sizing, honestly
 
-No load, latency or scale figure in this repository was measured, so none is claimed. The questions a
-production sizing starts from, and what changes with the answers:
+No load, latency or scale figure in this repository was measured, so none is claimed. What a production
+sizing starts from:
 
-- **Peak queries per second (QPS) versus concurrent users.** A turn is up to four model calls (understand, plan, generate, verify) plus two SQL queries and a rerank; the
-  model calls dominate wall time and Bedrock quotas, not the database. Size Fargate on concurrent streams,
-  not requests per second.
-- **95th-percentile latency (p95) target.** The rerank and the verifier are the two optional stages: the verifier can be sampled, the
-  reranker dropped to `HR_RERANK_BACKEND=none`, each with a measured quality cost first.
+- **Peak queries per second (QPS) versus concurrent users.** A turn is up to four model calls plus two SQL
+  queries and a rerank; the model calls dominate wall time and Bedrock quotas. Size Fargate on concurrent
+  streams, not requests per second.
+- **95th-percentile latency (p95) target.** The rerank and the verifier are the two optional stages: the
+  verifier can be sampled, the reranker dropped to `HR_RERANK_BACKEND=none`, each with a measured quality cost first.
 - **Churn and freshness.** Each filing version is one idempotent job; `writer.py` skips an unchanged
-  content hash and replaces children on a changed one. A permission change on SharePoint is an ACL row
-  update plus a `GroupCache.invalidate` for affected users; the 300-second time to live (TTL) bounds how stale a
-  membership can be.
-- **At 5 to 20 million chunks.** pgvector Hierarchical Navigable Small World (HNSW) index build time and the index's memory footprint become the
-  constraint before query latency does; partition by org (or move to one database per large tenant), tune
-  `ef_search`, and expect the ACL `EXISTS` to be the planner's hardest decision: it may need a materialized
-  `(document_id, principal_id)` join or a denormalized readers array on `chunks`.
-- **When OpenSearch wins.** When sparse retrieval needs Best Match 25 (BM25) ranking with field boosts and analyzers Postgres
-  full-text does not offer, when the index must scale independently of the transactional database, or
-  when near-real-time replication of millions of ACL changes outgrows row updates. Until then one store
-  with one predicate is simpler to prove correct ([ADR 0001](docs/adr/0001-pgvector-over-opensearch.md)).
+  content hash. A permission change is an ACL row update plus a `GroupCache.invalidate`; the 300-second
+  time to live (TTL) bounds how stale a membership can be.
+- **At 5 to 20 million chunks.** The pgvector Hierarchical Navigable Small World (HNSW) index build time
+  and memory become the constraint before query latency; partition by org, tune `ef_search`, and expect the
+  ACL `EXISTS` to be the planner's hardest decision.
+- **When OpenSearch wins.** When sparse retrieval needs Best Match 25 (BM25) ranking with field boosts
+  Postgres full-text does not offer, or the index must scale independently of the transactional database.
+  Until then one store with one predicate is simpler to prove correct ([ADR 0001](docs/adr/0001-pgvector-over-opensearch.md)).
 
 ## Production vs this demo
 
 | Concern | In production | In this demo, because |
 |---|---|---|
+| Supervisor routing | A model-driven supervisor with handoffs and a re-plan loop after evidence arrives (`plan()` takes `evidence_summary` for it) | Fixed graph edges, routing on state; the graph passes `evidence_summary=None`; one question per turn, provable and replayable |
+| Researcher | A research sub-loop (query rewriting, multi-hop) under the same `run_tool` door | One pass over the planned calls, deterministic; the demo corpus is two companies |
+| Judge | The verifier tuned on labelled data, with offline evals in the release gate | A second cheaper model with one retry; Ragas and DeepEval scripts exist in `evals/` and have never been run against Bedrock here |
+| Approver | Approvals routed to Slack or Teams behind single sign-on (SSO), with an audit of who approved | A card in the web UI; the audit row records the thread, not a named approver |
+| Human waits | Multi-day waits as a Temporal workflow | A LangGraph checkpoint parked at `interrupt()`; fine for minutes, never tested for days |
+| Model gateway | Bedrock only | `gateway/fake.py` plans and writes deterministically so tests and the $0 quickstart run offline |
+| Duplicate writes in flight | Postgres `LISTEN`/`NOTIFY` or a queue to wake the second caller | The loser polls the reserved key for up to 2 seconds (`IN_PROGRESS_WAIT_S` in `harness/runner.py`), else `in_progress` |
+| Tracing | Sampled; the collector fans out to X-Ray / Tempo and a managed tracing backend | Every span to the local OpenTelemetry collector and Phoenix (`observability/otel.py`) |
 | Policy evaluation | Amazon Verified Permissions (`authz/verified_permissions.py`) | Cedar in process with `cedarpy` (`authz/cedar_local.py`); same policies, same entity mapping; no AWS call per decision at $0 |
 | Generation / verification | Claude Sonnet 4.5 generates, Claude Haiku 4.5 verifies and classifies, on Bedrock | `gateway/fake.py`: deterministic answers built only from the evidence lines; offline tests |
 | Embeddings | Titan Text Embeddings v2 at 512 dimensions | `jinaai/jina-embeddings-v2-small-en` via fastembed, also 512, so the column never changes |
@@ -250,28 +320,22 @@ production sizing starts from, and what changes with the answers:
 | Network | Private subnets, network address translation (NAT) or egress endpoints | Public subnets, no NAT (`modules/network`), saves ~$33/month |
 | Terraform state | Remote state with locking | Local state in `envs/dev`, so a clone can `init` with no pre-existing resource |
 | Deploy | `apply` from a reviewed plan in a protected environment | `deploy.yml` stops at `plan` |
-| Tracing | Sampled, collector fans out to X-Ray / Tempo and Phoenix | Every span to both local endpoints (`observability/otel.py`) |
 | Checkpoints in tests | `AsyncPostgresSaver` | `MemorySaver`, injected by `graph.configure` |
 
 ## Repository layout
 
-| Folder | Layer | Owner module |
-|---|---|---|
-| `infra/terraform`, `infra/otel`, `infra/grafana` | L1 Cloud / Platform | `envs/dev/main.tf` |
-| `services/harness_rag/ingest` | L2 Data / Pipelines | `workflow.py` (Temporal), `writer.py` (one transaction per filing) |
-| `services/harness_rag/gateway` | L3 Models | `bedrock.py`, `fake.py`; `retrieval/embed.py`, `retrieval/rerank.py` |
-| `services/harness_rag/retrieval`, `services/harness_rag/authz` | L4 Knowledge / Retrieval | `sql.py` (the predicate), `hybrid.py`, `facts.py`; `cedar_local.py`, `group_cache.py`, `audit.py` |
-| `services/harness_rag/harness` | L5 AI Harness | `identity.py`, `registry.py`, `runner.py`, `budget.py`, `tools/` |
-| `services/harness_rag/agent` | L6 Orchestration | `graph.py` |
-| `apps/web`, `services/harness_rag/api`, `services/harness_rag/mcp_server` | L7 Experience | React (Vite) SPA; `api/app.py`; `mcp_server/server.py` |
-| `services/harness_rag/{contracts,interfaces,config,db}.py` | Shared | typed contracts, ports, settings, the Postgres door |
-| `db/migrations`, `db/policies` | Schema and policy | `0001_schema.sql`, `documents.cedar`, `tools.cedar` |
-| `tests`, `evals` | Proof | see below |
-| `docs` | Decisions | `ARCHITECTURE.md`, `SECURITY.md`, `TOUR.md`, `DEMO.md`, `adr/` |
+The seven layer folders are in [The stack](#the-stack). The rest:
+
+| Folder | Role |
+|---|---|
+| `services/harness_rag/{contracts,interfaces,config,db}.py` | typed contracts, ports, settings, the Postgres door |
+| `db/migrations`, `db/policies` | `0001_schema.sql`, `0002_seed_dev.sql`; `documents.cedar`, `tools.cedar` |
+| `tests`, `evals` | proof, see below |
+| `docs` | `ARCHITECTURE.md`, `SECURITY.md`, `TOUR.md`, `DEMO.md`, `CONTRACTS.md`, `adr/` |
 
 The UI is a Vite + React + TypeScript SPA (React Router, Tailwind, Zod), built to static `dist/` files behind
-nginx locally or S3 + CloudFront on AWS. It is a pure client over the server-sent events (SSE) interface with nothing to render on a
-server, so there is no Next.js.
+nginx locally or S3 + CloudFront on AWS. It is a pure client over the SSE interface with nothing to render
+on a server, so there is no Next.js.
 
 ## Tests and evals
 
@@ -311,7 +375,7 @@ uv run pytest evals/suites -q         # the permission-leak and citation suites 
 - [0008 Model-driven tool selection](docs/adr/0008-model-driven-tool-selection.md)
 - [0009 Rerank relevance floor](docs/adr/0009-rerank-relevance-floor.md)
 
-Cross-layer types and entry points are pinned in [docs/CONTRACTS.md](docs/CONTRACTS.md).
+Cross-layer types, entry points and the agent team are pinned in [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 ## Built with
 
@@ -323,6 +387,7 @@ Terraform.
 
 - **10-K, 10-Q, 8-K:** U.S. SEC annual, quarterly and current-event report forms.
 - **ACL:** access control list, who may read a document or item.
+- **ADOT:** AWS Distro for OpenTelemetry, the tracing sidecar on Fargate.
 - **ADR:** architecture decision record, a short note on one design choice.
 - **AI:** artificial intelligence.
 - **ALB:** Application Load Balancer, the AWS front door for web traffic.
@@ -342,7 +407,6 @@ Terraform.
 - **JWT:** JSON Web Token, the signed sign-in token.
 - **MCP:** Model Context Protocol, a standard way for AI tools to call functions.
 - **NAT:** network address translation, lets private servers reach the internet.
-- **ONNX:** Open Neural Network Exchange, a portable model file format.
 - **p95:** 95th-percentile latency, the time 95 percent of requests beat.
 - **PDF:** Portable Document Format.
 - **PKCE:** Proof Key for Code Exchange, a safe browser sign-in flow.
@@ -357,6 +421,7 @@ Terraform.
 - **SPA:** single-page application, a web app that loads once.
 - **SQL:** Structured Query Language, how the database is queried.
 - **SSE:** server-sent events, a one-way stream from server to browser.
+- **SSO:** single sign-on, one corporate login for every tool.
 - **TTL:** time to live, how long a cached value stays valid.
 - **UI:** user interface.
 - **VPC:** Virtual Private Cloud, a private network in AWS.
