@@ -54,7 +54,7 @@ test:             ## works with the stack down: database-gated tests skip
 
 lint:
 	$(UV) ruff format --check services tests evals && $(UV) ruff check . && $(UV) mypy services/finance_agents
-	cd apps/web && pnpm lint
+	cd apps/web && pnpm install --frozen-lockfile --silent && pnpm lint
 
 web:
 	cd apps/web && pnpm dev
